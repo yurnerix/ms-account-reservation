@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-fill-account-statuses
+      author: yurnerix
+      runAlways: true
+      runOnChange: true
+
+      changes:
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: |
+              INSERT INTO account_status (name, description)
+              VALUES
+                  ('NEW', 'Счёт создан в БД'),
+                  ('IN_CREATION', 'Запрос на создание счёта был отправлен в смежную систему'),
+                  ('CREATED', 'Счёт создан в смежной системе'),
+                  ('CANCELLED', 'Счёт аннулирован'),
+                  ('CLOSED', 'Счёт закрыт')
+              ON CONFLICT (name)
+              DO UPDATE
+              SET description = EXCLUDED.description;
