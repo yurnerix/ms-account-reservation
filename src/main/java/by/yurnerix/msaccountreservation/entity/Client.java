@@ -1,9 +1,15 @@
 package by.yurnerix.msaccountreservation.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.UUID;
 
+@Getter
+@Setter
+@NoArgsConstructor
 @Entity
 @Table(name = "client")
 public class Client {
@@ -33,9 +39,6 @@ public class Client {
     @Column(name = "mdm_code", nullable = false)
     private Long mdmCode;
 
-    public Client() {
-
-    }
 
     public Client(String fullName, String citizenship, String clientType, String documentNumber, String documentSeries, String documentType, Long mdmCode) {
         this.fullName = fullName;
@@ -47,64 +50,5 @@ public class Client {
         this.mdmCode = mdmCode;
     }
 
-    public UUID getId() {
-        return id;
-    }
 
-
-    public String getFullName() {
-        return fullName;
-    }
-
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
-
-    public String getCitizenship() {
-        return citizenship;
-    }
-
-    public void setCitizenship(String citizenship) {
-        this.citizenship = citizenship;
-    }
-
-    public String getClientType() {
-        return clientType;
-    }
-
-    public void setClientType(String clientType) {
-        this.clientType = clientType;
-    }
-
-    public String getDocumentNumber() {
-        return documentNumber;
-    }
-
-    public void setDocumentNumber(String documentNumber) {
-        this.documentNumber = documentNumber;
-    }
-
-    public String getDocumentSeries() {
-        return documentSeries;
-    }
-
-    public void setDocumentSeries(String documentSeries) {
-        this.documentSeries = documentSeries;
-    }
-
-    public String getDocumentType() {
-        return documentType;
-    }
-
-    public void setDocumentType(String documentType) {
-        this.documentType = documentType;
-    }
-
-    public Long getMdmCode() {
-        return mdmCode;
-    }
-
-    public void setMdmCode(Long mdmCode) {
-        this.mdmCode = mdmCode;
-    }
 }

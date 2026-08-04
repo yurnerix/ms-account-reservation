@@ -2,6 +2,11 @@ databaseChangeLog:
   - changeSet:
       id: 001-create-account-status
       author: yurnerix
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: account_status
       changes:
         - createTable:
             tableName: account_status
@@ -33,6 +38,12 @@ databaseChangeLog:
   - changeSet:
       id: 002-create-client
       author: yurnerix
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: client
+
       changes:
         - createTable:
             tableName: client
@@ -87,6 +98,12 @@ databaseChangeLog:
   - changeSet:
       id: 003-create-account
       author: yurnerix
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: account
+
       changes:
         - createTable:
             tableName: account

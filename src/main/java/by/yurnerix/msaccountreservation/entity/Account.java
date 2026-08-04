@@ -1,9 +1,15 @@
 package by.yurnerix.msaccountreservation.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.UUID;
 
+@Getter
+@Setter
+@NoArgsConstructor
 @Entity
 @Table(name = "account")
 public class Account {
@@ -26,49 +32,11 @@ public class Account {
     @Column(name = "currency_code", nullable = false, length = 3)
     private String currencyCode;
 
-    public Account() {
-    }
 
     public Account(AccountStatus status, Client client, String accountType, String currencyCode) {
         this.status = status;
         this.client = client;
         this.accountType = accountType;
-        this.currencyCode = currencyCode;
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public AccountStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(AccountStatus status) {
-        this.status = status;
-    }
-
-    public Client getClient() {
-        return client;
-    }
-
-    public void setClient(Client client) {
-        this.client = client;
-    }
-
-    public String getAccountType() {
-        return accountType;
-    }
-
-    public void setAccountType(String accountType) {
-        this.accountType = accountType;
-    }
-
-    public String getCurrencyCode() {
-        return currencyCode;
-    }
-
-    public void setCurrencyCode(String currencyCode) {
         this.currencyCode = currencyCode;
     }
 
