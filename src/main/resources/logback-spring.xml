@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration>
+
+    <!-- Название микросервиса -->
+    <springProperty
+            scope="context"
+            name="APPLICATION_NAME"
+            source="spring.application.name"
+            defaultValue="ms-account-reservation"/>
+
+    <!-- Уровень логирования библиотек и Spring -->
+    <springProperty
+            scope="context"
+            name="ROOT_LOG_LEVEL"
+            source="logging.level.root"
+            defaultValue="INFO"/>
+
+    <!-- Уровень логирования кода микросервиса -->
+    <springProperty
+            scope="context"
+            name="APPLICATION_LOG_LEVEL"
+            source="logging.level.by.yurnerix.msaccountreservation"
+            defaultValue="DEBUG"/>
+
+    <!-- Директория для log-файлов -->
+    <springProperty
+            scope="context"
+            name="LOG_PATH"
+            source="logging.file.path"
+            defaultValue="logs"/>
+
+    <!-- Общий шаблон log-сообщения -->
+    <property
+            name="LOG_PATTERN"
+            value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [${APPLICATION_NAME}] [%thread] %logger{36} - %msg%n%ex"/>
+
+    <!-- Вывод логов в консоль -->
+    <appender
+            name="CONSOLE"
+            class="ch.qos.logback.core.ConsoleAppender">
+
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Вывод логов в файл с ротацией -->
+    <appender
+            name="FILE"
+            class="ch.qos.logback.core.rolling.RollingFileAppender">
+
+        <!-- Текущий log-файл -->
+        <file>${LOG_PATH}/${APPLICATION_NAME}.log</file>
+
+        <!-- Архивация по дате и размеру -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+
+            <fileNamePattern>${LOG_PATH}/archive/${APPLICATION_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+
+            <!-- Максимальный размер одного файла -->
+            <maxFileSize>10MB</maxFileSize>
+
+            <!-- Количество дней хранения -->
+            <maxHistory>14</maxHistory>
+
+            <!-- Максимальный общий размер архивов -->
+            <totalSizeCap>1GB</totalSizeCap>
+
+        </rollingPolicy>
+
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Логирование собственного кода микросервиса -->
+    <logger
+            name="by.yurnerix.msaccountreservation"
+            level="${APPLICATION_LOG_LEVEL}"/>
+
+    <!-- Настройка по умолчанию для Spring и остальных библиотек -->
+    <root level="${ROOT_LOG_LEVEL}">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>
