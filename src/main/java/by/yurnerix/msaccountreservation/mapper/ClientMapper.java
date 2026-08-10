@@ -11,87 +11,43 @@ import by.yurnerix.msaccountreservation.generated.dto.ClientSummaryDto;
 import by.yurnerix.msaccountreservation.generated.dto.CreateClientRequestDto;
 import by.yurnerix.msaccountreservation.generated.dto.PageMetadataDto;
 import by.yurnerix.msaccountreservation.generated.dto.UpdateClientRequestDto;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.ReportingPolicy;
 import org.springframework.data.domain.Page;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.UUID;
 
-@Component
-public class ClientMapper {
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING,
+        unmappedTargetPolicy = ReportingPolicy.ERROR)
+public interface ClientMapper {
 
-    public Client toEntity(CreateClientRequestDto request)
-    {
-        return new Client(
-                request.getMdmId(),
-                request.getFirstName(),
-                request.getLastName(),
-                request.getMiddleName(),
-                request.getCitizenship(),
-                request.getClientType(),
-                request.getDocumentNumber(),
-                request.getDocumentSeries(),
-                request.getDocumentType()
-        );
-    }
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
+    Client toEntity(CreateClientRequestDto request);
 
-    public void updateEntity(Client client, UpdateClientRequestDto request)
-    {
-        client.setFirstName(request.getFirstName());
-        client.setLastName(request.getLastName());
-        client.setMiddleName(request.getMiddleName());
-    }
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "firstName", source = "firstName")
+    @Mapping(target = "lastName", source = "lastName")
+    @Mapping(target = "middleName", source = "middleName")
+    void updateEntity(UpdateClientRequestDto request, @MappingTarget Client client);
 
-    public ClientResponseDto toResponse(Client client)
-    {
-        return new ClientResponseDto()
-                .id(client.getId())
-                .mdmId(client.getMdmId())
-                .firstName(client.getFirstName())
-                .lastName(client.getLastName())
-                .middleName(client.getMiddleName())
-                .citizenship(client.getCitizenship())
-                .clientType(client.getClientType())
-                .documentNumber(client.getDocumentNumber())
-                .documentSeries(client.getDocumentSeries())
-                .documentType(client.getDocumentType())
-                .status(toStatusDto(client.getStatus()))
-                .createdAt(client.getCreatedAt())
-                .updatedAt(client.getUpdatedAt());
-    }
 
-    public ClientDetailsResponseDto toDetailsResponse(Client client)
-    {
-        return new ClientDetailsResponseDto()
-                .id(client.getId())
-                .mdmId(client.getMdmId())
-                .firstName(client.getFirstName())
-                .lastName(client.getLastName())
-                .middleName(client.getMiddleName())
-                .citizenship(client.getCitizenship())
-                .clientType(client.getClientType())
-                .documentNumber(client.getDocumentNumber())
-                .documentSeries(client.getDocumentSeries())
-                .documentType(client.getDocumentType())
-                .status(toStatusDto(client.getStatus()))
-                .createdAt(client.getCreatedAt())
-                .updatedAt(client.getUpdatedAt())
-                .hasAccounts(false);
-    }
+    ClientResponseDto toResponse(Client client);
 
-    public ClientSummaryDto toSummary(Client client)
-    {
-        return new ClientSummaryDto()
-                .id(client.getId())
-                .mdmId(client.getMdmId())
-                .firstName(client.getFirstName())
-                .lastName(client.getLastName())
-                .middleName(client.getMiddleName())
-                .status(toStatusDto(client.getStatus()));
-    }
+    @Mapping(target = "hasAccounts", constant = "false")
+    ClientDetailsResponseDto toDetailsResponse(Client client);
 
-    public ClientPageResponseDto toPageResponse(Page<Client> page)
-    {
+    ClientSummaryDto toSummary(Client client);
+
+
+    default ClientPageResponseDto toPageResponse(Page<Client> page) {
         List<ClientSummaryDto> content = page.getContent()
                 .stream()
                 .map(this::toSummary)
@@ -108,23 +64,26 @@ public class ClientMapper {
                 .pageable(metadata);
     }
 
-    public ClientExistsResponseDto toExistsResponse(UUID requestedClientId, Client client) {
+    default ClientExistsResponseDto toExistsResponse(UUID requestedClientId, Client client) {
         boolean exists = client != null && client.getStatus() != ClientStatus.DELETED;
 
         ClientExistsResponseDto response = new ClientExistsResponseDto()
                 .exists(exists)
                 .clientId(requestedClientId);
 
-        if (client != null)
-        {
+        if (client != null) {
             response.setStatus(toStatusDto(client.getStatus()));
         }
 
         return response;
     }
 
-    private ClientStatusDto toStatusDto(ClientStatus status)
-    {
+
+    default ClientStatusDto toStatusDto(ClientStatus status) {
+        if (status == null) {
+            return null;
+        }
+
         return ClientStatusDto.fromValue(status.name());
     }
 }

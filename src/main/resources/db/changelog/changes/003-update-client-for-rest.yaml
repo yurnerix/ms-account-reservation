@@ -71,9 +71,10 @@ databaseChangeLog:
 
         # новые клиенты не используют старое составное поле
 
-        - dropColumn:
+        - dropNotNullConstraint:
             tableName: client
             columnName: full_name
+            columnDataType: VARCHAR(255)
 
         # уникальность mdmId на уровне БД
         - addUniqueConstraint:

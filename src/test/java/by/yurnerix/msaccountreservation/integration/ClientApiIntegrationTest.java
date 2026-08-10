@@ -1,46 +1,38 @@
 package by.yurnerix.msaccountreservation.integration;
 
+import by.yurnerix.msaccountreservation.entity.Account;
+import by.yurnerix.msaccountreservation.entity.AccountStatus;
 import by.yurnerix.msaccountreservation.entity.Client;
 import by.yurnerix.msaccountreservation.entity.ClientStatus;
+import by.yurnerix.msaccountreservation.entity.AccountStatusName;
 import by.yurnerix.msaccountreservation.generated.dto.ClientResponseDto;
 import by.yurnerix.msaccountreservation.generated.dto.CreateClientRequestDto;
 import by.yurnerix.msaccountreservation.generated.dto.UpdateClientRequestDto;
+import by.yurnerix.msaccountreservation.repository.AccountRepository;
 import by.yurnerix.msaccountreservation.repository.AccountStatusRepository;
 import by.yurnerix.msaccountreservation.repository.ClientRepository;
-import by.yurnerix.msaccountreservation.entity.Account;
-import by.yurnerix.msaccountreservation.entity.AccountStatus;
-import by.yurnerix.msaccountreservation.repository.AccountRepository;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.database.rider.core.api.dataset.DataSet;
+import com.github.database.rider.junit5.api.DBRider;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.params.provider.EnumSource;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-@ActiveProfiles("test")
+import java.util.UUID;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@DBRider
 @Transactional
-class ClientApiIntegrationTest
-{
+class ClientApiIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private AccountStatusRepository accountStatusRepository;
@@ -58,21 +50,18 @@ class ClientApiIntegrationTest
     private AccountRepository accountRepository;
 
     @Test
-    void contextShouldStartWithMigratedDatabase()
-    {
+    void contextShouldStartWithMigratedDatabase() {
         assertAll(
                 () -> assertEquals(5, accountStatusRepository.count()),
-                () -> assertTrue(accountStatusRepository.findByName("NEW").isPresent()),
-                () -> assertTrue(accountStatusRepository.findByName("IN_CREATION").isPresent()),
-                () -> assertTrue(accountStatusRepository.findByName("CREATED").isPresent()),
-                () -> assertTrue(accountStatusRepository.findByName("CANCELLED").isPresent()),
-                () -> assertTrue(accountStatusRepository.findByName("CLOSED").isPresent())
-        );
+                () -> assertTrue(accountStatusRepository.findByName(AccountStatusName.NEW).isPresent()),
+                () -> assertTrue(accountStatusRepository.findByName(AccountStatusName.IN_CREATION).isPresent()),
+                () -> assertTrue(accountStatusRepository.findByName(AccountStatusName.CREATED).isPresent()),
+                () -> assertTrue(accountStatusRepository.findByName(AccountStatusName.CANCELLED).isPresent()),
+                () -> assertTrue(accountStatusRepository.findByName(AccountStatusName.CLOSED).isPresent()));
     }
 
     @Test
-    void createClientShouldPersistClientAndReturn201() throws Exception
-    {
+    void createClientShouldPersistClientAndReturn201() throws Exception {
         CreateClientRequestDto request = new CreateClientRequestDto();
 
         request.setMdmId(9876543210L);
@@ -127,8 +116,7 @@ class ClientApiIntegrationTest
         );
     }
 
-    private CreateClientRequestDto createValidRequest(Long mdmId)
-    {
+    private CreateClientRequestDto createValidRequest(Long mdmId) {
         CreateClientRequestDto request = new CreateClientRequestDto();
 
         request.setMdmId(mdmId);
@@ -145,8 +133,7 @@ class ClientApiIntegrationTest
     }
 
     @Test
-    void createClientShouldReturn409WhenMdmIdAlreadyExists() throws Exception
-    {
+    void createClientShouldReturn409WhenMdmIdAlreadyExists() throws Exception {
         Long mdmId = 7777777777L;
 
         CreateClientRequestDto request = createValidRequest(mdmId);
@@ -154,9 +141,9 @@ class ClientApiIntegrationTest
         String requestBody = objectMapper.writeValueAsString(request);
 
         mockMvc.perform(post("/api/v1/clients")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .accept(MediaType.APPLICATION_JSON)
-                                .content(requestBody)).andExpect(status()
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .content(requestBody)).andExpect(status()
                 .isCreated());
 
         mockMvc.perform(post("/api/v1/clients")
@@ -179,27 +166,22 @@ class ClientApiIntegrationTest
     }
 
     @Test
-    void getClientShouldReturnPersistedClient() throws Exception
-    {
-        Client client = new Client(
-                8888888888L,
-                "Иван",
-                "Петров",
-                "Сергеевич",
-                "Россия",
-                "INDIVIDUAL",
-                "123456",
-                "1234",
-                "PASSPORT"
-        );
+    @DataSet(value = "datasets/client/active-client.yml",
+            cleanBefore = true,
+            cleanAfter = true,
+            disableConstraints = true,
+            skipCleaningFor = {
+                "account_status", "databasechangelog", "databasechangeloglock"
+            })
+    void getClientShouldReturnPersistedClient() throws Exception {
+        UUID clientId = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-        Client savedClient = clientRepository.saveAndFlush(client);
 
-        mockMvc.perform(get("/api/v1/clients/{clientId}", savedClient.getId())
+        mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
                         .accept(MediaType.APPLICATION_JSON))
+
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id")
-                        .value(savedClient.getId().toString()))
+                .andExpect(jsonPath("$.id").value(clientId.toString()))
                 .andExpect(jsonPath("$.mdmId").value(8888888888L))
                 .andExpect(jsonPath("$.firstName").value("Иван"))
                 .andExpect(jsonPath("$.lastName").value("Петров"))
@@ -215,8 +197,7 @@ class ClientApiIntegrationTest
                 .andExpect(jsonPath("$.hasAccounts").value(false));
     }
 
-    private Client saveClient(Long mdmId)
-    {
+    private Client saveClient(Long mdmId) {
         return saveClient(
                 mdmId,
                 "Иван",
@@ -224,27 +205,25 @@ class ClientApiIntegrationTest
         );
     }
 
-    private Client saveClient(Long mdmId, String firstName, String lastName)
-    {
-        Client client = new Client(
-                mdmId,
-                firstName,
-                lastName,
-                "Сергеевич",
-                "Россия",
-                "INDIVIDUAL",
-                String.valueOf(mdmId),
-                "1234",
-                "PASSPORT"
-        );
+    private Client saveClient(Long mdmId, String firstName, String lastName) {
+        Client client = Client.builder()
+                .mdmId(mdmId)
+                .firstName(firstName)
+                .lastName(lastName)
+                .middleName("Сергеевич")
+                .citizenship("Россия")
+                .clientType("INDIVIDUAL")
+                .documentNumber(String.valueOf(mdmId))
+                .documentSeries("1234")
+                .documentType("PASSPORT")
+                .build();
 
         return clientRepository.saveAndFlush(client);
     }
 
 
     @Test
-    void updateClientShouldUpdatePersistedClient() throws Exception
-    {
+    void updateClientShouldUpdatePersistedClient() throws Exception {
         Client savedClient = saveClient(6666666666L);
 
         String originalDocumentNumber = savedClient.getDocumentNumber();
@@ -285,8 +264,7 @@ class ClientApiIntegrationTest
     }
 
     @Test
-    void deleteClientShouldSoftDeleteClient() throws Exception
-    {
+    void deleteClientShouldSoftDeleteClient() throws Exception {
         Client savedClient = saveClient(5555555555L);
 
         mockMvc.perform(delete("/api/v1/clients/{clientId}", savedClient.getId()))
@@ -318,35 +296,17 @@ class ClientApiIntegrationTest
     }
 
     @Test
-    void searchClientsShouldFilterByLastNameAndExcludeDeleted() throws Exception
-    {
-        Client firstClient = saveClient(
-                9111111111L,
-                "Иван",
-                "Петров"
-        );
-
-        Client secondClient = saveClient(
-                9222222222L,
-                "Пётр",
-                "Петровский"
-        );
-
-        saveClient(
-                9333333333L,
-                "Анна",
-                "Сидорова"
-        );
-
-        Client deletedClient = saveClient(
-                9444444444L,
-                "Алексей",
-                "Петров"
-        );
-
-        deletedClient.setStatus(ClientStatus.DELETED);
-        clientRepository.saveAndFlush(deletedClient);
-
+    @DataSet(value = "datasets/client/multiple-clients.yml",
+            cleanBefore = true,
+            cleanAfter = true,
+            disableConstraints = true,
+            skipCleaningFor = {
+                    "account_status",
+                    "databasechangelog",
+                    "databasechangeloglock"
+            }
+    )
+    void searchClientsShouldFilterByLastNameAndExcludeDeleted() throws Exception {
         mockMvc.perform(get("/api/v1/clients")
                         .param("page", "0")
                         .param("size", "20")
@@ -356,7 +316,7 @@ class ClientApiIntegrationTest
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.content.length()").value(2))
-                .andExpect(jsonPath("$.content[*].mdmId").value(containsInAnyOrder(firstClient.getMdmId(), secondClient.getMdmId())))
+                .andExpect(jsonPath("$.content[*].mdmId").value(containsInAnyOrder(9111111111L, 9222222222L)))
                 .andExpect(jsonPath("$.content[*].status").value(containsInAnyOrder("ACTIVE", "ACTIVE")))
                 .andExpect(jsonPath("$.pageable.pageNumber").value(0))
                 .andExpect(jsonPath("$.pageable.pageSize").value(20))
@@ -365,8 +325,7 @@ class ClientApiIntegrationTest
     }
 
     @Test
-    void searchClientsShouldFilterByMdmId() throws Exception
-    {
+    void searchClientsShouldFilterByMdmId() throws Exception {
         saveClient(
                 9555555555L,
                 "Иван",
@@ -402,8 +361,7 @@ class ClientApiIntegrationTest
     }
 
     @Test
-    void searchClientsShouldReturnRequestedPage() throws Exception
-    {
+    void searchClientsShouldReturnRequestedPage() throws Exception {
         saveClient(
                 9811111111L,
                 "Иван",
@@ -437,9 +395,12 @@ class ClientApiIntegrationTest
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"NEW", "IN_CREATION", "CREATED"})
-    void deleteClientShouldReturn409WhenAccountIsActive(String accountStatusName) throws Exception
-    {
+    @EnumSource(value = AccountStatusName.class, names = {
+                    "NEW",
+                    "IN_CREATION",
+                    "CREATED"
+            })
+    void deleteClientShouldReturn409WhenAccountIsActive(AccountStatusName accountStatusName) throws Exception {
         Client savedClient = saveClient(5444444444L);
 
         AccountStatus accountStatus = accountStatusRepository
@@ -478,9 +439,11 @@ class ClientApiIntegrationTest
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"CANCELLED", "CLOSED"})
-    void deleteClientShouldSoftDeleteWhenAccountIsNotActive(String accountStatusName) throws Exception
-    {
+    @EnumSource(value = AccountStatusName.class, names = {
+                    "CANCELLED",
+                    "CLOSED"
+            })
+    void deleteClientShouldSoftDeleteWhenAccountIsNotActive(AccountStatusName accountStatusName) throws Exception {
         Client savedClient = saveClient(5333333333L);
 
         AccountStatus accountStatus = accountStatusRepository

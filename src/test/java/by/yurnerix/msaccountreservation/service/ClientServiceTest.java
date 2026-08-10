@@ -20,21 +20,13 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
-
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ClientServiceTest {
@@ -55,21 +47,20 @@ class ClientServiceTest {
     private Client client;
 
     @BeforeEach
-    void setUp()
-    {
+    void setUp() {
         clientId = UUID.randomUUID();
-        client = new Client();
 
-        client.setId(clientId);
-        client.setMdmId(1234567890L);
-        client.setFirstName("Иван");
-        client.setLastName("Петров");
-        client.setStatus(ClientStatus.ACTIVE);
+        client = Client.builder()
+                .id(clientId)
+                .mdmId(1234567890L)
+                .firstName("Иван")
+                .lastName("Петров")
+                .status(ClientStatus.ACTIVE)
+                .build();
     }
 
     @Test
-    void createClientShouldReturnCreatedClient()
-    {
+    void createClientShouldReturnCreatedClient() {
         CreateClientRequestDto request = new CreateClientRequestDto();
         request.setMdmId(1234567890L);
 
@@ -101,8 +92,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void createClientShouldThrowWhenMdmIdAlreadyExists()
-    {
+    void createClientShouldThrowWhenMdmIdAlreadyExists() {
         CreateClientRequestDto request = new CreateClientRequestDto();
         request.setMdmId(1234567890L);
 
@@ -119,8 +109,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void getClientShouldThrowWhenClientDoesNotExist()
-    {
+    void getClientShouldThrowWhenClientDoesNotExist() {
         when(clientRepository.findByIdAndStatusNot(clientId, ClientStatus.DELETED))
                 .thenReturn(Optional.empty());
 
@@ -131,8 +120,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void getClientShouldReturnClientWhenClientExists()
-    {
+    void getClientShouldReturnClientWhenClientExists() {
         ClientDetailsResponseDto expectedResponse = new ClientDetailsResponseDto();
 
         expectedResponse.setId(clientId);
@@ -155,8 +143,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void updateClientShouldUpdateAndReturnClient()
-    {
+    void updateClientShouldUpdateAndReturnClient() {
         UpdateClientRequestDto request = new UpdateClientRequestDto();
 
         request.setFirstName("Иван");
@@ -180,7 +167,7 @@ class ClientServiceTest {
         assertSame(expectedResponse, actualResponse);
 
         verify(clientMapper)
-                .updateEntity(client, request);
+                .updateEntity(request, client);
 
         verify(clientRepository)
                 .saveAndFlush(client);
@@ -188,8 +175,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void updateClientShouldThrowWhenClientDoesNotExist()
-    {
+    void updateClientShouldThrowWhenClientDoesNotExist() {
         UpdateClientRequestDto request = new UpdateClientRequestDto();
 
         request.setFirstName("Иван");
@@ -202,15 +188,14 @@ class ClientServiceTest {
         assertThrows(ClientNotFoundException.class, () -> clientService.updateClient(clientId, request));
 
         verify(clientMapper, never())
-                .updateEntity(any(Client.class), any(UpdateClientRequestDto.class));
+                .updateEntity(any(UpdateClientRequestDto.class), any(Client.class));
 
         verify(clientRepository, never())
                 .saveAndFlush(any(Client.class));
     }
 
     @Test
-    void deleteClientShouldThrowWhenClientHasActiveAccounts()
-    {
+    void deleteClientShouldThrowWhenClientHasActiveAccounts() {
         when(clientRepository.findByIdAndStatusNot(clientId, ClientStatus.DELETED))
                 .thenReturn(Optional.of(client));
 
@@ -226,8 +211,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void checkClientExistsShouldReturnResponseWhenClientExists()
-    {
+    void checkClientExistsShouldReturnResponseWhenClientExists() {
         ClientExistsResponseDto expectedResponse = new ClientExistsResponseDto();
 
         expectedResponse.setExists(true);
@@ -251,8 +235,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void checkClientExistsShouldReturnResponseWhenClientDoesNotExist()
-    {
+    void checkClientExistsShouldReturnResponseWhenClientDoesNotExist() {
         ClientExistsResponseDto expectedResponse = new ClientExistsResponseDto();
 
         expectedResponse.setExists(false);
@@ -276,8 +259,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void searchClientsShouldReturnPageResponse()
-    {
+    void searchClientsShouldReturnPageResponse() {
         Page<Client> clientsPage = new PageImpl<>(List.of(client));
 
         ClientPageResponseDto expectedResponse = new ClientPageResponseDto();
@@ -299,8 +281,7 @@ class ClientServiceTest {
     }
 
     @Test
-    void deleteClientShouldSetDeletedStatus()
-    {
+    void deleteClientShouldSetDeletedStatus() {
         when(clientRepository.findByIdAndStatusNot(clientId, ClientStatus.DELETED))
                 .thenReturn(Optional.of(client));
 

@@ -1,0 +1,12 @@
+client:
+  - id: "11111111-1111-1111-1111-111111111111"
+    mdm_id: 8888888888
+    first_name: "Иван"
+    last_name: "Петров"
+    middle_name: "Сергеевич"
+    citizenship: "Россия"
+    client_type: "INDIVIDUAL"
+    document_number: "123456"
+    document_series: "1234"
+    document_type: "PASSPORT"
+    status: "ACTIVE"

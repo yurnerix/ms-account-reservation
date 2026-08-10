@@ -4,16 +4,15 @@ import by.yurnerix.msaccountreservation.generated.dto.ErrorCodeDto;
 import by.yurnerix.msaccountreservation.generated.dto.ErrorResponseDto;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.actuate.autoconfigure.observation.ObservationProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.HttpMediaTypeNotSupportedException;
 
 import java.util.stream.Collectors;
 
@@ -22,8 +21,7 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ClientNotFoundException.class)
-    public ResponseEntity<ErrorResponseDto> handleClientNotFound(ClientNotFoundException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleClientNotFound(ClientNotFoundException exception) {
         log.warn(
                 "Client not found: {}",
                 exception.getMessage()
@@ -37,8 +35,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ClientAlreadyExistsException.class)
-    public ResponseEntity<ErrorResponseDto> handleClientAlreadyExists(ClientAlreadyExistsException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleClientAlreadyExists(ClientAlreadyExistsException exception) {
         log.warn(
                 "Client already exists: {}",
                 exception.getMessage()
@@ -52,8 +49,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ClientHasActiveAccountException.class)
-    public ResponseEntity<ErrorResponseDto> handleClientHasActiveAccounts(ClientHasActiveAccountException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleClientHasActiveAccounts(ClientHasActiveAccountException exception) {
         log.warn(
                 "Client deletion conflict: {}",
                 exception.getMessage()
@@ -67,8 +63,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponseDto> handleRequestBodyValidation(MethodArgumentNotValidException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleRequestBodyValidation(MethodArgumentNotValidException exception) {
         String description = exception.getBindingResult()
                 .getFieldErrors()
                 .stream()
@@ -95,8 +90,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HandlerMethodValidationException.class)
-    public ResponseEntity<ErrorResponseDto> handleMethodValidation(HandlerMethodValidationException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleMethodValidation(HandlerMethodValidationException exception) {
         log.warn(
                 "Request parameter validation: {}",
                 exception.getMessage()
@@ -110,8 +104,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponseDto> handleConstraintViolation(ConstraintViolationException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleConstraintViolation(ConstraintViolationException exception) {
         String description = exception.getConstraintViolations()
                 .stream()
                 .map(violation ->
@@ -136,8 +129,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponseDto> handleTypeMismatch(MethodArgumentTypeMismatchException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
         String description = "Некорректное значение параметра: "
                 + exception.getName();
 
@@ -154,8 +146,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponseDto> handleUnreadableRequest(HttpMessageNotReadableException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleUnreadableRequest(HttpMessageNotReadableException exception) {
         log.warn(
                 "Request body cannot be read: {}",
                 exception.getMessage()
@@ -170,8 +161,7 @@ public class GlobalExceptionHandler {
 
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponseDto> handleUnexpectedException(Exception exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleUnexpectedException(Exception exception) {
         log.error(
                 "Unexpected application error",
                 exception
@@ -184,8 +174,7 @@ public class GlobalExceptionHandler {
         );
     }
 
-    private ResponseEntity<ErrorResponseDto> buildErrorResponse(HttpStatus status, ErrorCodeDto errorCode, String description)
-    {
+    private ResponseEntity<ErrorResponseDto> buildErrorResponse(HttpStatus status, ErrorCodeDto errorCode, String description) {
         ErrorResponseDto response = new ErrorResponseDto(errorCode, description, status.value());
 
         return ResponseEntity
@@ -194,8 +183,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-    public ResponseEntity<ErrorResponseDto> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception)
-    {
+    public ResponseEntity<ErrorResponseDto> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
         log.warn(
                 "Unsupported content type: {}",
                 exception.getContentType()

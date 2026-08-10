@@ -1,12 +1,7 @@
 package by.yurnerix.msaccountreservation.entity;
 
 import jakarta.persistence.*;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
+import lombok.*;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -14,7 +9,9 @@ import java.util.UUID;
 
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Entity
 @Table(name = "client", uniqueConstraints = {@UniqueConstraint(name = "uk_client_mdm_id", columnNames = "mdm_id")})
 public class Client {
@@ -51,6 +48,7 @@ public class Client {
     @Column(name = "document_type", nullable = false, length = 50)
     private String documentType;
 
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ClientStatus status = ClientStatus.ACTIVE;
@@ -61,32 +59,16 @@ public class Client {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
-    public Client(Long mdmId, String firstName, String lastName, String middleName, String citizenship, String clientType, String documentNumber, String documentSeries, String documentType) {
-        this.mdmId = mdmId;
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.middleName = middleName;
-        this.citizenship = citizenship;
-        this.clientType = clientType;
-        this.documentNumber = documentNumber;
-        this.documentSeries = documentSeries;
-        this.documentType = documentType;
-        this.status = ClientStatus.ACTIVE;
-
-    }
 
     @PrePersist
-    private void beforeCreate()
-    {
+    private void beforeCreate() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
 
-        if (status == null)
-        {
+        if (status == null) {
             status = ClientStatus.ACTIVE;
         }
 
-        if (createdAt == null)
-        {
+        if (createdAt == null) {
             createdAt = now;
         }
 
@@ -95,8 +77,7 @@ public class Client {
     }
 
     @PreUpdate
-    private void beforeUpdate()
-    {
+    private void beforeUpdate() {
         updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 }

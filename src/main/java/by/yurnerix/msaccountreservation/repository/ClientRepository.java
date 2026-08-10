@@ -2,7 +2,6 @@ package by.yurnerix.msaccountreservation.repository;
 
 import by.yurnerix.msaccountreservation.entity.Client;
 import by.yurnerix.msaccountreservation.entity.ClientStatus;
-import org.springframework.data.domain.Example;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 

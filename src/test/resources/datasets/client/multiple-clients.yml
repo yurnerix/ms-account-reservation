@@ -1,0 +1,48 @@
+client:
+  - id: "11111111-1111-1111-1111-111111111111"
+    mdm_id: 9111111111
+    first_name: "Иван"
+    last_name: "Петров"
+    middle_name: "Сергеевич"
+    citizenship: "Россия"
+    client_type: "INDIVIDUAL"
+    document_number: "111111"
+    document_series: "1111"
+    document_type: "PASSPORT"
+    status: "ACTIVE"
+
+  - id: "22222222-2222-2222-2222-222222222222"
+    mdm_id: 9222222222
+    first_name: "Пётр"
+    last_name: "Петровский"
+    middle_name: "Андреевич"
+    citizenship: "Россия"
+    client_type: "INDIVIDUAL"
+    document_number: "222222"
+    document_series: "2222"
+    document_type: "PASSPORT"
+    status: "ACTIVE"
+
+  - id: "33333333-3333-3333-3333-333333333333"
+    mdm_id: 9333333333
+    first_name: "Анна"
+    last_name: "Сидорова"
+    middle_name: "Ивановна"
+    citizenship: "Россия"
+    client_type: "INDIVIDUAL"
+    document_number: "333333"
+    document_series: "3333"
+    document_type: "PASSPORT"
+    status: "ACTIVE"
+
+  - id: "44444444-4444-4444-4444-444444444444"
+    mdm_id: 9444444444
+    first_name: "Алексей"
+    last_name: "Петров"
+    middle_name: "Иванович"
+    citizenship: "Россия"
+    client_type: "INDIVIDUAL"
+    document_number: "444444"
+    document_series: "4444"
+    document_type: "PASSPORT"
+    status: "DELETED"

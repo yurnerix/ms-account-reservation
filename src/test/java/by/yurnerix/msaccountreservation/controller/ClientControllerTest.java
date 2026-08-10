@@ -1,47 +1,31 @@
 package by.yurnerix.msaccountreservation.controller;
 
-import by.yurnerix.msaccountreservation.generated.dto.ClientDetailsResponseDto;
-import by.yurnerix.msaccountreservation.generated.dto.ClientExistsResponseDto;
-import by.yurnerix.msaccountreservation.generated.dto.ClientResponseDto;
-import by.yurnerix.msaccountreservation.generated.dto.ClientStatusDto;
-import by.yurnerix.msaccountreservation.generated.dto.CreateClientRequestDto;
-import by.yurnerix.msaccountreservation.generated.dto.UpdateClientRequestDto;
-import by.yurnerix.msaccountreservation.generated.dto.ClientPageResponseDto;
-import by.yurnerix.msaccountreservation.generated.dto.ClientSummaryDto;
-import by.yurnerix.msaccountreservation.generated.dto.PageMetadataDto;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import by.yurnerix.msaccountreservation.exception.ClientAlreadyExistsException;
+import by.yurnerix.msaccountreservation.exception.ClientHasActiveAccountException;
+import by.yurnerix.msaccountreservation.exception.ClientNotFoundException;
+import by.yurnerix.msaccountreservation.generated.dto.*;
 import by.yurnerix.msaccountreservation.service.ClientService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import by.yurnerix.msaccountreservation.exception.ClientAlreadyExistsException;
-import by.yurnerix.msaccountreservation.exception.ClientHasActiveAccountException;
-import by.yurnerix.msaccountreservation.exception.ClientNotFoundException;
 
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.hamcrest.Matchers.endsWith;
 
 @WebMvcTest(ClientController.class)
 class ClientControllerTest {
@@ -60,8 +44,7 @@ class ClientControllerTest {
     private OffsetDateTime updatedAt;
 
     @BeforeEach
-    void setUp()
-    {
+    void setUp() {
         clientId = UUID.fromString("a1b2c3d4-e5f6-4890-abcd-ef1234567890");
 
         createdAt = OffsetDateTime.parse("2024-01-15T10:30:00Z");
@@ -69,8 +52,7 @@ class ClientControllerTest {
         updatedAt = OffsetDateTime.parse("2024-01-15T11:45:00Z");
     }
 
-    private CreateClientRequestDto createValidRequest()
-    {
+    private CreateClientRequestDto createValidRequest() {
         CreateClientRequestDto request = new CreateClientRequestDto();
 
         request.setMdmId(1234567890L);
@@ -86,8 +68,7 @@ class ClientControllerTest {
         return request;
     }
 
-    private ClientResponseDto createClientResponse()
-    {
+    private ClientResponseDto createClientResponse() {
         ClientResponseDto response = new ClientResponseDto();
 
         response.setId(clientId);
@@ -109,8 +90,7 @@ class ClientControllerTest {
 
 
     @Test
-    void createClientShouldReturn201AndCreateClient() throws Exception
-    {
+    void createClientShouldReturn201AndCreateClient() throws Exception {
         CreateClientRequestDto request = createValidRequest();
 
         ClientResponseDto response = createClientResponse();
@@ -119,12 +99,12 @@ class ClientControllerTest {
         )).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/clients")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .accept(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
 
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "/api/v1/clients/" + clientId))
+                .andExpect(header().string("Location", endsWith("/api/v1/clients/" + clientId)))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(clientId.toString()))
                 .andExpect(jsonPath("$.mdmId").value(1234567890L))
@@ -139,8 +119,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void getClientShouldReturn200AndClient() throws Exception
-    {
+    void getClientShouldReturn200AndClient() throws Exception {
         ClientDetailsResponseDto response = new ClientDetailsResponseDto();
 
         response.setId(clientId);
@@ -162,7 +141,7 @@ class ClientControllerTest {
                 .thenReturn(response);
 
         mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
-                                .accept(MediaType.APPLICATION_JSON))
+                        .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id").value(clientId.toString()))
@@ -176,8 +155,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void checkClientExistsShouldReturn200AndExistsTrue() throws Exception
-    {
+    void checkClientExistsShouldReturn200AndExistsTrue() throws Exception {
         ClientExistsResponseDto response = new ClientExistsResponseDto();
 
         response.setExists(true);
@@ -200,8 +178,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void deleteClientShouldReturn204() throws Exception
-    {
+    void deleteClientShouldReturn204() throws Exception {
         mockMvc.perform(delete("/api/v1/clients/{clientId}", clientId))
                 .andExpect(status().isNoContent())
                 .andExpect(content().string(""));
@@ -210,8 +187,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void createClientShouldReturn400WhenRequestIsInvalid() throws Exception
-    {
+    void createClientShouldReturn400WhenRequestIsInvalid() throws Exception {
         CreateClientRequestDto request = createValidRequest();
 
         request.setFirstName("   ");
@@ -231,8 +207,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void createClientShouldReturn409WhenMdmIdAlreadyExists() throws Exception
-    {
+    void createClientShouldReturn409WhenMdmIdAlreadyExists() throws Exception {
         CreateClientRequestDto request = createValidRequest();
 
         when(clientService.createClient(any(CreateClientRequestDto.class)))
@@ -253,8 +228,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void getClientShouldReturn404WhenClientDoesNotExist() throws Exception
-    {
+    void getClientShouldReturn404WhenClientDoesNotExist() throws Exception {
         when(clientService.getClient(clientId))
                 .thenThrow(new ClientNotFoundException(clientId));
 
@@ -271,8 +245,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void deleteClientShouldReturn409WhenClientHasActiveAccounts() throws Exception
-    {
+    void deleteClientShouldReturn409WhenClientHasActiveAccounts() throws Exception {
         doThrow(new ClientHasActiveAccountException(clientId))
                 .when(clientService)
                 .deleteClient(clientId);
@@ -288,8 +261,7 @@ class ClientControllerTest {
         verify(clientService).deleteClient(clientId);
     }
 
-    private UpdateClientRequestDto createValidUpdateRequest()
-    {
+    private UpdateClientRequestDto createValidUpdateRequest() {
         UpdateClientRequestDto request = new UpdateClientRequestDto();
 
         request.setFirstName("Пётр");
@@ -300,8 +272,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void updateClientShouldReturn200AndUpdatedClient() throws Exception
-    {
+    void updateClientShouldReturn200AndUpdatedClient() throws Exception {
         UpdateClientRequestDto request = createValidUpdateRequest();
 
         ClientResponseDto response = createClientResponse();
@@ -329,12 +300,11 @@ class ClientControllerTest {
 
         verify(clientService)
                 .updateClient(eq(clientId), any(UpdateClientRequestDto.class)
-        );
+                );
     }
 
     @Test
-    void updateClientShouldReturn400WhenRequestIsInvalid() throws Exception
-    {
+    void updateClientShouldReturn400WhenRequestIsInvalid() throws Exception {
         UpdateClientRequestDto request = createValidUpdateRequest();
 
         request.setLastName(null);
@@ -353,8 +323,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void updateClientShouldReturn404WhenClientDoesNotExist() throws Exception
-    {
+    void updateClientShouldReturn404WhenClientDoesNotExist() throws Exception {
         UpdateClientRequestDto request = createValidUpdateRequest();
 
         when(clientService.updateClient(eq(clientId), any(UpdateClientRequestDto.class)))
@@ -376,8 +345,7 @@ class ClientControllerTest {
     }
 
 
-    private ClientPageResponseDto createPageResponse()
-    {
+    private ClientPageResponseDto createPageResponse() {
         ClientSummaryDto summary = new ClientSummaryDto();
 
         summary.setId(clientId);
@@ -403,8 +371,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void searchClientsShouldReturn200AndClientPage() throws Exception
-    {
+    void searchClientsShouldReturn200AndClientPage() throws Exception {
         ClientPageResponseDto response = createPageResponse();
 
         when(clientService.searchClients(
@@ -444,8 +411,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void searchClientsShouldUseDefaultPagination() throws Exception
-    {
+    void searchClientsShouldUseDefaultPagination() throws Exception {
         PageMetadataDto metadata = new PageMetadataDto();
 
         metadata.setPageNumber(0);
@@ -484,8 +450,7 @@ class ClientControllerTest {
 
     @ParameterizedTest
     @ValueSource(ints = {0, 101})
-    void searchClientsShouldReturn400WhenSizeIsInvalid(int invalidSize) throws Exception
-    {
+    void searchClientsShouldReturn400WhenSizeIsInvalid(int invalidSize) throws Exception {
         mockMvc.perform(get("/api/v1/clients")
                         .param("page", "0")
                         .param("size", String.valueOf(invalidSize))
@@ -501,13 +466,12 @@ class ClientControllerTest {
     }
 
     @Test
-    void searchClientsShouldReturn400WhenPageIsNegative() throws Exception
-    {
+    void searchClientsShouldReturn400WhenPageIsNegative() throws Exception {
         mockMvc.perform(
-                get("/api/v1/clients")
-                        .param("page", "-1")
-                        .param("size", "20")
-                        .accept(MediaType.APPLICATION_JSON))
+                        get("/api/v1/clients")
+                                .param("page", "-1")
+                                .param("size", "20")
+                                .accept(MediaType.APPLICATION_JSON))
 
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
@@ -519,8 +483,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void getClientShouldReturn400WhenClientIdIsInvalid() throws Exception
-    {
+    void getClientShouldReturn400WhenClientIdIsInvalid() throws Exception {
         mockMvc.perform(get("/api/v1/clients/{clientId}", "not-a-uuid")
                         .accept(MediaType.APPLICATION_JSON))
 
@@ -534,13 +497,12 @@ class ClientControllerTest {
     }
 
     @Test
-    void createClientShouldReturn400WhenJsonIsMalformed() throws Exception
-    {
+    void createClientShouldReturn400WhenJsonIsMalformed() throws Exception {
         String malformedJson = """
-            {
-              "mdmId": 1234567890,
-              "firstName": "Иван",
-            """;
+                {
+                  "mdmId": 1234567890,
+                  "firstName": "Иван",
+                """;
 
         mockMvc.perform(post("/api/v1/clients")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -557,8 +519,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void createClientShouldReturn415WhenContentTypeIsUnsupported() throws Exception
-    {
+    void createClientShouldReturn415WhenContentTypeIsUnsupported() throws Exception {
         mockMvc.perform(post("/api/v1/clients")
                         .contentType(MediaType.TEXT_PLAIN)
                         .accept(MediaType.APPLICATION_JSON)
@@ -573,8 +534,7 @@ class ClientControllerTest {
     }
 
     @Test
-    void deleteClientShouldReturn404WhenClientDoesNotExist() throws Exception
-    {
+    void deleteClientShouldReturn404WhenClientDoesNotExist() throws Exception {
         doThrow(new ClientNotFoundException(clientId))
                 .when(clientService)
                 .deleteClient(clientId);
@@ -593,8 +553,7 @@ class ClientControllerTest {
 
     @Test
     void getClientShouldReturn500WhenUnexpectedErrorOccurs()
-            throws Exception
-    {
+            throws Exception {
         when(clientService.getClient(clientId))
                 .thenThrow(new IllegalStateException("Unexpected test error"));
 

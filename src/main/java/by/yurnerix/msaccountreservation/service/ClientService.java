@@ -1,18 +1,23 @@
 package by.yurnerix.msaccountreservation.service;
 
-
+import by.yurnerix.msaccountreservation.entity.AccountStatusName;
 import by.yurnerix.msaccountreservation.entity.Client;
 import by.yurnerix.msaccountreservation.entity.ClientStatus;
 import by.yurnerix.msaccountreservation.exception.ClientAlreadyExistsException;
 import by.yurnerix.msaccountreservation.exception.ClientHasActiveAccountException;
 import by.yurnerix.msaccountreservation.exception.ClientNotFoundException;
-import by.yurnerix.msaccountreservation.generated.dto.*;
+import by.yurnerix.msaccountreservation.generated.dto.ClientDetailsResponseDto;
+import by.yurnerix.msaccountreservation.generated.dto.ClientExistsResponseDto;
+import by.yurnerix.msaccountreservation.generated.dto.ClientPageResponseDto;
+import by.yurnerix.msaccountreservation.generated.dto.ClientResponseDto;
+import by.yurnerix.msaccountreservation.generated.dto.CreateClientRequestDto;
+import by.yurnerix.msaccountreservation.generated.dto.UpdateClientRequestDto;
 import by.yurnerix.msaccountreservation.mapper.ClientMapper;
 import by.yurnerix.msaccountreservation.repository.AccountRepository;
 import by.yurnerix.msaccountreservation.repository.ClientRepository;
+import by.yurnerix.msaccountreservation.specification.ClientSpecifications;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -21,8 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.Locale;
-import java.util.Set;
+import java.util.EnumSet;
 import java.util.UUID;
 
 @Slf4j
@@ -30,67 +34,53 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ClientService {
 
-    private static final Set<String> ACTIVE_ACCOUNT_STATUSES = Set.of(
-            "NEW",
-            "IN_CREATION",
-            "CREATED"
-    );
+    private static final EnumSet<AccountStatusName> ACTIVE_ACCOUNT_STATUSES = EnumSet.of(
+                    AccountStatusName.NEW,
+                    AccountStatusName.IN_CREATION,
+                    AccountStatusName.CREATED
+            );
 
     private final ClientRepository clientRepository;
     private final AccountRepository accountRepository;
     private final ClientMapper clientMapper;
 
     @Transactional
-    public ClientResponseDto createClient(CreateClientRequestDto request)
-    {
-        if (clientRepository.existsByMdmId(request.getMdmId()))
-        {
-            throw new ClientAlreadyExistsException(request.getMdmId());
+    public ClientResponseDto createClient(CreateClientRequestDto request) {
+        Long mdmId = request.getMdmId();
+
+        if (clientRepository.existsByMdmId(mdmId)) {
+            throw new ClientAlreadyExistsException(mdmId);
         }
 
         Client client = clientMapper.toEntity(request);
+        Client savedClient = clientRepository.saveAndFlush(client);
 
-        try {
-            Client savedClient = clientRepository.saveAndFlush(client);
+        log.info(
+                "Client created successfully: clientId={}, mdmId={}",
+                savedClient.getId(),
+                savedClient.getMdmId()
+        );
 
-            log.info(
-                    "Client created successfully: clientId={}",
-                    savedClient.getId()
-            );
-
-            return clientMapper.toResponse(savedClient);
-        } catch (DataIntegrityViolationException exception) {
-
-            if (clientRepository.existsByMdmId(request.getMdmId()))
-            {
-                throw new ClientAlreadyExistsException(request.getMdmId());
-            }
-
-            throw exception;
-        }
-
+        return clientMapper.toResponse(savedClient);
     }
 
     @Transactional(readOnly = true)
-    public ClientDetailsResponseDto getClient(UUID clientId)
-    {
+    public ClientDetailsResponseDto getClient(UUID clientId) {
         Client client = findActiveClient(clientId);
+
         return clientMapper.toDetailsResponse(client);
     }
 
     @Transactional(readOnly = true)
-    public ClientPageResponseDto searchClients(int page, int size, String lastName, Long mdmId)
-    {
-        Specification<Client> specification = notDeleted();
+    public ClientPageResponseDto searchClients(int page, int size, String lastName, Long mdmId) {
+        Specification<Client> specification = ClientSpecifications.notDeleted();
 
-        if (StringUtils.hasText(lastName))
-        {
-            specification = specification.and(lastNameContains(lastName));
+        if (StringUtils.hasText(lastName)) {
+            specification = specification.and(ClientSpecifications.lastNameContains(lastName));
         }
 
-        if (mdmId != null)
-        {
-            specification = specification.and(mdmIdEquals(mdmId));
+        if (mdmId != null) {
+            specification = specification.and(ClientSpecifications.mdmIdEquals(mdmId));
         }
 
         Sort sort = Sort.by(
@@ -107,11 +97,10 @@ public class ClientService {
     }
 
     @Transactional
-    public ClientResponseDto updateClient(UUID clientId, UpdateClientRequestDto request)
-    {
+    public ClientResponseDto updateClient(UUID clientId, UpdateClientRequestDto request) {
         Client client = findActiveClient(clientId);
 
-        clientMapper.updateEntity(client, request);
+        clientMapper.updateEntity(request, client);
 
         Client updatedClient = clientRepository.saveAndFlush(client);
 
@@ -124,17 +113,17 @@ public class ClientService {
     }
 
     @Transactional
-    public void deleteClient(UUID clientId)
-    {
+    public void deleteClient(UUID clientId) {
         Client client = findActiveClient(clientId);
 
-        boolean hasActiveAccounts = accountRepository.existsByClientIdAndStatusNameIn(
-                clientId,
-                ACTIVE_ACCOUNT_STATUSES
-        );
+        boolean hasActiveAccounts = accountRepository.existsByClientIdAndStatusNameIn(clientId, ACTIVE_ACCOUNT_STATUSES);
 
-        if (hasActiveAccounts)
-        {
+        if (hasActiveAccounts) {
+            log.warn(
+                    "Client deletion rejected because active accounts exist: clientId={}",
+                    clientId
+            );
+
             throw new ClientHasActiveAccountException(clientId);
         }
 
@@ -148,45 +137,19 @@ public class ClientService {
     }
 
     @Transactional(readOnly = true)
-    public ClientExistsResponseDto checkClientExists(UUID clientId)
-    {
-        Client client = clientRepository.findById(clientId)
+    public ClientExistsResponseDto checkClientExists(UUID clientId) {
+        Client client = clientRepository
+                .findById(clientId)
                 .orElse(null);
 
         return clientMapper.toExistsResponse(clientId, client);
-
     }
 
-    private Client findActiveClient(UUID clientId)
-    {
+    private Client findActiveClient(UUID clientId) {
         return clientRepository
                 .findByIdAndStatusNot(clientId, ClientStatus.DELETED)
-                .orElseThrow(() -> new ClientNotFoundException(clientId));
-    }
-
-    private Specification<Client> notDeleted()
-    {
-        return (root, query, criteriaBuilder) ->
-                criteriaBuilder.notEqual(root.get("status"), ClientStatus.DELETED);
-    }
-
-    private Specification<Client> lastNameContains(String lastName)
-    {
-        String pattern = "%" + lastName.trim().toLowerCase(Locale.ROOT) + "%";
-
-        return (root, query, criteriaBuilder) ->
-                criteriaBuilder.like(
-                        criteriaBuilder.lower(root.get("lastName")),
-                        pattern
-                );
-    }
-
-    private Specification<Client> mdmIdEquals(Long mdmId)
-    {
-        return (root, query, criteriaBuilder) ->
-                criteriaBuilder.equal(
-                        root.get("mdmId"),
-                        mdmId
+                .orElseThrow(
+                        () -> new ClientNotFoundException(clientId)
                 );
     }
 }

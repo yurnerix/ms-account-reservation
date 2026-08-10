@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.mapstruct.factory.Mappers;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -27,9 +28,8 @@ class ClientMapperTest {
 
 
     @BeforeEach
-    void setUp()
-    {
-        clientMapper = new ClientMapper();
+    void setUp() {
+        clientMapper = Mappers.getMapper(ClientMapper.class);
 
         clientId = UUID.fromString("a1b2c3d4-e5f6-4890-abcd-ef1234567890");
 
@@ -37,26 +37,25 @@ class ClientMapperTest {
 
         updateAt = OffsetDateTime.parse("2024-01-15T11:45:00Z");
 
-        client = new Client();
-
-        client.setId(clientId);
-        client.setMdmId(1234567890L);
-        client.setFirstName("Иван");
-        client.setLastName("Петров");
-        client.setMiddleName("Сергеевич");
-        client.setCitizenship("Россия");
-        client.setClientType("INDIVIDUAL");
-        client.setDocumentNumber("123456");
-        client.setDocumentSeries("1234");
-        client.setDocumentType("PASSPORT");
-        client.setStatus(ClientStatus.ACTIVE);
-        client.setCreatedAt(createdAt);
-        client.setUpdatedAt(updateAt);
+        client = Client.builder()
+                .id(clientId)
+                .mdmId(1234567890L)
+                .firstName("Иван")
+                .lastName("Петров")
+                .middleName("Сергеевич")
+                .citizenship("Россия")
+                .clientType("INDIVIDUAL")
+                .documentNumber("123456")
+                .documentSeries("1234")
+                .documentType("PASSPORT")
+                .status(ClientStatus.ACTIVE)
+                .createdAt(createdAt)
+                .updatedAt(updateAt)
+                .build();
     }
 
     @Test
-    void toEntityShouldMapCreateRequestToClient()
-    {
+    void toEntityShouldMapCreateRequestToClient() {
         CreateClientRequestDto request = new CreateClientRequestDto();
 
         request.setMdmId(1234567890L);
@@ -88,8 +87,7 @@ class ClientMapperTest {
     }
 
     @Test
-    void updateEntityShouldUpdateClientNames()
-    {
+    void updateEntityShouldUpdateClientNames() {
 
         UpdateClientRequestDto request = new UpdateClientRequestDto();
 
@@ -97,7 +95,7 @@ class ClientMapperTest {
         request.setLastName("Сидоров");
         request.setMiddleName("Александрович");
 
-        clientMapper.updateEntity(client, request);
+        clientMapper.updateEntity(request, client);
 
         assertAll(
                 () -> assertEquals("Пётр", client.getFirstName()),
@@ -111,8 +109,7 @@ class ClientMapperTest {
     }
 
     @Test
-    void toResponseShouldMapClientToResponseDto()
-    {
+    void toResponseShouldMapClientToResponseDto() {
         ClientResponseDto result = clientMapper.toResponse(client);
 
         assertAll(
@@ -134,8 +131,7 @@ class ClientMapperTest {
     }
 
     @Test
-    void toDetailsResponseShouldMapClientAndSetHasAccountsFalse()
-    {
+    void toDetailsResponseShouldMapClientAndSetHasAccountsFalse() {
         ClientDetailsResponseDto result =
                 clientMapper.toDetailsResponse(client);
 
@@ -158,8 +154,7 @@ class ClientMapperTest {
     }
 
     @Test
-    void toPageResponseShouldMapContentAndPageMetadata()
-    {
+    void toPageResponseShouldMapContentAndPageMetadata() {
         Page<Client> page = new PageImpl<>(List.of(client), PageRequest.of(1, 2), 5);
 
         ClientPageResponseDto result = clientMapper.toPageResponse(page);
@@ -191,8 +186,7 @@ class ClientMapperTest {
     }
 
     @Test
-    void toExistsResponseShouldReturnTrueForActiveClient()
-    {
+    void toExistsResponseShouldReturnTrueForActiveClient() {
         ClientExistsResponseDto result = clientMapper.toExistsResponse(clientId, client);
 
         assertAll(
@@ -203,8 +197,7 @@ class ClientMapperTest {
     }
 
     @Test
-    void toExistsResponseShouldReturnFalseForDeletedClient()
-    {
+    void toExistsResponseShouldReturnFalseForDeletedClient() {
         client.setStatus(ClientStatus.DELETED);
 
         ClientExistsResponseDto result = clientMapper.toExistsResponse(clientId, client);
@@ -217,8 +210,7 @@ class ClientMapperTest {
     }
 
     @Test
-    void toExistsResponseShouldReturnFalseWhenClientIsMissing()
-    {
+    void toExistsResponseShouldReturnFalseWhenClientIsMissing() {
         ClientExistsResponseDto result = clientMapper.toExistsResponse(clientId, null);
 
         assertAll(

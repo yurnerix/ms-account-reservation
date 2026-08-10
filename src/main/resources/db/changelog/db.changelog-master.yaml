@@ -7,3 +7,6 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/changes/003-update-client-for-rest.yaml
+
+  - include:
+      file: db/changelog/changes/004-add-client-search-index.yaml
