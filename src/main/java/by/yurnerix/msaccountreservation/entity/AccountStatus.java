@@ -1,13 +1,13 @@
 package by.yurnerix.msaccountreservation.entity;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Entity
 @Table(name = "account_status")
 public class AccountStatus {
@@ -16,18 +16,11 @@ public class AccountStatus {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "name", nullable = false, unique = true, length = 50)
-    private String name;
+    private AccountStatusName name;
 
     @Column(name = "description", nullable = false, length = 255)
     private String description;
-
-
-
-    public AccountStatus(String name, String description)
-    {
-        this.name = name;
-        this.description = description;
-    }
 
 }

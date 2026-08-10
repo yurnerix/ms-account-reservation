@@ -1,13 +1,13 @@
 package by.yurnerix.msaccountreservation;
 
+import by.yurnerix.msaccountreservation.integration.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class MsAccountReservationApplicationTests {
+class MsAccountReservationApplicationTests extends AbstractIntegrationTest {
 
 	@Test
 	void contextLoads() {
+
 	}
 
 }

@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: "jdbc:postgresql://${TEST_DATABASE_HOST:localhost}:${TEST_DATABASE_PORT:5432}/${TEST_DATABASE_NAME:account_reservation_test}"
+    username: ${TEST_DATABASE_USER:postgres}
+    password: ${TEST_DATABASE_PASSWORD:asterisk}
+    driver-class-name: org.postgresql.Driver
+
+  liquibase:
+    enabled: ${TEST_LIQUIBASE_ENABLED:true}
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    default-schema: ${TEST_LIQUIBASE_DEFAULT_SCHEMA:public}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: ${TEST_JPA_SHOW_SQL:false}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: ${TEST_JPA_FORMAT_SQL:true}
+
+logging:
+  level:
+    root: ${TEST_LOG_LEVEL_ROOT:INFO}
+    by.yurnerix.msaccountreservation: ${TEST_LOG_LEVEL_APPLICATION:DEBUG}

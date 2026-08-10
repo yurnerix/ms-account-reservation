@@ -1,0 +1,9 @@
+cacheConnection: false
+cacheTableNames: false
+leakHunter: false
+
+caseInsensitiveStrategy: !!com.github.database.rider.core.api.configuration.Orthography 'LOWERCASE'
+
+properties:
+  qualifiedTableNames: false
+  caseSensitiveTableNames: false

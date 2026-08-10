@@ -1,10 +1,14 @@
 package by.yurnerix.msaccountreservation.repository;
 
 import by.yurnerix.msaccountreservation.entity.Account;
+import by.yurnerix.msaccountreservation.entity.AccountStatusName;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.UUID;
 
 public interface AccountRepository extends JpaRepository<Account, UUID> {
+
+    boolean existsByClientIdAndStatusNameIn(UUID clientId, Collection<AccountStatusName> statusNames);
 
 }

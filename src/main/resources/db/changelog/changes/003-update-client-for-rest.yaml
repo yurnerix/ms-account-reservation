@@ -1,0 +1,90 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-update-client-for-rest
+      author: yurnerix
+
+      changes:
+        # mdm_code: приведение к названию из REST-контракта
+        - renameColumn:
+            tableName: client
+            oldColumnName: mdm_code
+            newColumnName: mdm_id
+            columnDataType: BIGINT
+
+        # добавление фио отдельными полями
+        - addColumn:
+            tableName: client
+            columns:
+              - column:
+                  name: first_name
+                  type: VARCHAR(100)
+
+              - column:
+                  name: last_name
+                  type: VARCHAR(100)
+
+              - column:
+                  name: middle_name
+                  type: VARCHAR(100)
+
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        # перенос старого значения full_name для уже существующих записей
+
+        - sql:
+            dbms: postgresql
+            sql: |
+              UPDATE client
+              SET first_name = full_name,
+                  last_name = 'UNKNOWN'
+              WHERE first_name IS NULL
+                OR last_name IS NULL;
+
+        - addNotNullConstraint:
+            tableName: client
+            columnName: first_name
+            columnDataType: VARCHAR(100)
+
+        - addNotNullConstraint:
+            tableName: client
+            columnName: last_name
+            columnDataType: VARCHAR(100)
+
+        # новые клиенты не используют старое составное поле
+
+        - dropNotNullConstraint:
+            tableName: client
+            columnName: full_name
+            columnDataType: VARCHAR(255)
+
+        # уникальность mdmId на уровне БД
+        - addUniqueConstraint:
+            tableName: client
+            columnNames: mdm_id
+            constraintName: uk_client_mdm_id
+
+        - createIndex:
+            tableName: client
+            indexName: idx_client_status
+            columns:
+              - column:
+                  name: status
