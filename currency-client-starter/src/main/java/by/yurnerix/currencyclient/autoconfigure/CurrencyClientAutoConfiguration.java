@@ -1,48 +1,71 @@
 package by.yurnerix.currencyclient.autoconfigure;
 
 
+import by.yurnerix.currencyclient.client.CurrencyApiClient;
 import by.yurnerix.currencyclient.config.CurrencyClientProperties;
 import by.yurnerix.currencyclient.service.CurrencyService;
 import by.yurnerix.currencyclient.service.DefaultCurrencyService;
+import feign.Feign;
+import feign.FeignException;
+import feign.RetryableException;
+
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.web.client.RestTemplateAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.Bean;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.retry.support.RetryTemplate;
+
 
 @AutoConfiguration
-@AutoConfigureAfter(RestTemplateAutoConfiguration.class)
-@ConditionalOnClass(RestTemplate.class)
+@ConditionalOnClass({Feign.class, RetryTemplate.class})
 @ConditionalOnProperty(
         prefix = "app.currency-client",
         name = "enabled",
         havingValue = "true",
         matchIfMissing = true
 )
+@EnableFeignClients(clients = CurrencyApiClient.class)
 @EnableConfigurationProperties(CurrencyClientProperties.class)
 public class CurrencyClientAutoConfiguration {
 
-    @Bean("currencyClientRestTemplate")
-    @ConditionalOnMissingBean(name = "currencyClientRestTemplate")
-    public RestTemplate currencyClientRestTemplate(RestTemplateBuilder builder, CurrencyClientProperties properties) {
-        return builder
-                .connectTimeout(properties.getConnectTimeout())
-                .readTimeout(properties.getReadTimeout())
+    @Bean("currencyClientRetryTemplate")
+    @ConditionalOnMissingBean(name = "currencyClientRetryTemplate")
+    public RetryTemplate currencyClientRetryTemplate(CurrencyClientProperties properties) {
+        CurrencyClientProperties.RetryProperties retry = properties.getRetry();
+
+        int maxAttempts = retry.isEnabled() ? retry.getMaxAttempts() : 1;
+
+        return RetryTemplate.builder()
+                .maxAttempts(maxAttempts)
+                .exponentialBackoff(retry.getInitialInterval().toMillis(), retry.getMultiplier(), retry.getMaxInterval().toMillis())
+                .retryOn(this::isRetryable)
                 .build();
     }
 
     @Bean
     @ConditionalOnMissingBean(CurrencyService.class)
-    public DefaultCurrencyService currencyService(@Qualifier("currencyClientRestTemplate") RestTemplate restTemplate, CurrencyClientProperties properties) {
-        return new DefaultCurrencyService(restTemplate, properties);
+    public CurrencyService currencyService(CurrencyApiClient currencyApiClient, CurrencyClientProperties properties, @Qualifier("currencyClientRetryTemplate") RetryTemplate retryTemplate) {
+        return new DefaultCurrencyService(currencyApiClient, properties, retryTemplate);
     }
 
+    private boolean isRetryable(Throwable throwable) {
+        if (throwable instanceof RetryableException) {
+            return true;
+        }
+
+        if (throwable instanceof FeignException exception) {
+            int status = exception.status();
+
+            return status == 429 || status >= 500;
+        }
+
+        return false;
+    }
 
 
 }

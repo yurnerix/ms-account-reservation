@@ -1,24 +1,30 @@
 package by.yurnerix.currencyclient.service;
 
+import by.yurnerix.currencyclient.client.CurrencyApiClient;
 import by.yurnerix.currencyclient.config.CurrencyClientProperties;
 import by.yurnerix.currencyclient.dto.ExchangeRateResponse;
 import by.yurnerix.currencyclient.exception.CurrencyClientException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import java.math.BigDecimal;
-import java.net.URI;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
+@Slf4j
 @RequiredArgsConstructor
 public class DefaultCurrencyService implements CurrencyService {
     private static final String SUCCESS_RESULT = "success";
 
-    private final RestTemplate restTemplate;
+    private static final Pattern CURRENCY_CODE_PATTERN = Pattern.compile("^[A-Z]{3}$");
+
+    private final CurrencyApiClient currencyApiClient;
 
     private final CurrencyClientProperties properties;
+
+    private final RetryTemplate retryTemplate;
 
     @Override
     public BigDecimal getExchangeRate(String fromCurrency, String toCurrency) {
@@ -29,23 +35,31 @@ public class DefaultCurrencyService implements CurrencyService {
             return BigDecimal.ONE;
         }
 
-        ExchangeRateResponse response = restTemplate.getForObject(buildRequestUri(from, to), ExchangeRateResponse.class);
+        validateApiKey();
+
+        ExchangeRateResponse response = executeCurrencyRequest(from, to);
 
         return extractExchangeRate(response);
     }
 
-    private URI buildRequestUri(String fromCurrency, String toCurrency) {
+    private ExchangeRateResponse executeCurrencyRequest(String from, String to) {
+        return retryTemplate.execute(context -> {
+            int attempt = context.getRetryCount() + 1;
+
+            if (attempt > 1) {
+                log.warn("Retrying currency API request: " + "from={}, to={}, attempt={}", from, to, attempt);
+            }
+
+            return currencyApiClient.getExchangeRate(properties.getApiKey(), from, to);
+        });
+    }
+
+    private void validateApiKey() {
         if (!StringUtils.hasText(properties.getApiKey())) {
             throw new CurrencyClientException("Currency client API key is not configured");
         }
-
-        return UriComponentsBuilder
-                .fromUri(URI.create(properties.getBaseUrl()))
-                .pathSegment(properties.getApiKey(), "pair", fromCurrency, toCurrency)
-                .build()
-                .encode()
-                .toUri();
     }
+
 
     private BigDecimal extractExchangeRate(ExchangeRateResponse response) {
         if (response == null) {
@@ -72,8 +86,8 @@ public class DefaultCurrencyService implements CurrencyService {
                 .trim()
                 .toUpperCase(Locale.ROOT);
 
-        if (!normalizedCurrency.matches("[A-Z]{3}")) {
-            throw new IllegalArgumentException("Currency code must contain exactly three Latin letters");
+        if (!CURRENCY_CODE_PATTERN.matcher(normalizedCurrency).matches()) {
+            throw new IllegalArgumentException("Currency code must contain exactly " + "three Latin letters");
         }
 
         return normalizedCurrency;

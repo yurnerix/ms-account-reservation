@@ -1,1 +1,2 @@
 by.yurnerix.currencyclient.autoconfigure.CurrencyClientAutoConfiguration
+by.yurnerix.currencyclient.autoconfigure.CurrencyClientHealthAutoConfiguration

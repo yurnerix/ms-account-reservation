@@ -67,3 +67,13 @@ app:
     api-key: ${CURRENCY_CLIENT_API_KEY:}
     connect-timeout: ${CURRENCY_CLIENT_CONNECT_TIMEOUT:2s}
     read-timeout: ${CURRENCY_CLIENT_READ_TIMEOUT:5s}
+
+    retry:
+      enabled: ${CURRENCY_CLIENT_RETRY_ENABLED:true}
+      max-attempts: ${CURRENCY_CLIENT_RETRY_MAX_ATTEMPTS:3}
+      initial-interval: ${CURRENCY_CLIENT_RETRY_INITIAL_INTERVAL:200ms}
+      multiplier: ${CURRENCY_CLIENT_RETRY_MULTIPLIER:2.0}
+      max-interval: ${CURRENCY_CLIENT_RETRY_MAX_INTERVAL:2s}
+
+    health:
+      enabled: ${CURRENCY_CLIENT_HEALTH_ENABLED:true}
