@@ -1,0 +1,79 @@
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
+
+  application:
+    name: ${APPLICATION_NAME:ms-account-reservation}
+
+  datasource:
+    url: "jdbc:postgresql://${DATABASE_HOST:localhost}:${DATABASE_PORT:5432}/${DATABASE_NAME:account_reservation}"
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASSWORD:asterisk}
+    driver-class-name: org.postgresql.Driver
+
+  liquibase:
+    enabled: ${LIQUIBASE_ENABLED:true}
+    change-log: ${LIQUIBASE_CHANGE_LOG:classpath:db/changelog/db.changelog-master.yaml}
+    default-schema: ${LIQUIBASE_DEFAULT_SCHEMA:public}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: ${JPA_SHOW_SQL:false}
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: ${JPA_FORMAT_SQL:true}
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    by.yurnerix.msaccountreservation: ${LOG_LEVEL_APPLICATION:DEBUG}
+  file:
+    path: ${LOG_FILE_PATH:logs}
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:8081}
+
+  endpoints:
+    web:
+      exposure:
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info,threaddump}
+
+  endpoint:
+    health:
+      access: read-only
+      show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:never}
+
+    info:
+      access: read-only
+
+    threaddump:
+      access: read-only
+
+    shutdown:
+      access: none
+
+app:
+  currency-client:
+    enabled: ${CURRENCY_CLIENT_ENABLED:true}
+    base-url: ${CURRENCY_CLIENT_BASE_URL:https://v6.exchangerate-api.com/v6}
+    api-key: ${CURRENCY_CLIENT_API_KEY:}
+    connect-timeout: ${CURRENCY_CLIENT_CONNECT_TIMEOUT:2s}
+    read-timeout: ${CURRENCY_CLIENT_READ_TIMEOUT:5s}
+
+    retry:
+      enabled: ${CURRENCY_CLIENT_RETRY_ENABLED:true}
+      max-attempts: ${CURRENCY_CLIENT_RETRY_MAX_ATTEMPTS:3}
+      initial-interval: ${CURRENCY_CLIENT_RETRY_INITIAL_INTERVAL:200ms}
+      multiplier: ${CURRENCY_CLIENT_RETRY_MULTIPLIER:2.0}
+      max-interval: ${CURRENCY_CLIENT_RETRY_MAX_INTERVAL:2s}
+
+    health:
+      enabled: ${CURRENCY_CLIENT_HEALTH_ENABLED:true}
