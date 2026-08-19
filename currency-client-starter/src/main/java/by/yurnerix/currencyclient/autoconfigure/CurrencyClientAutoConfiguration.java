@@ -3,6 +3,7 @@ package by.yurnerix.currencyclient.autoconfigure;
 
 import by.yurnerix.currencyclient.client.CurrencyApiClient;
 import by.yurnerix.currencyclient.config.CurrencyClientProperties;
+import by.yurnerix.currencyclient.health.CurrencyClientHealthIndicator;
 import by.yurnerix.currencyclient.service.CurrencyService;
 import by.yurnerix.currencyclient.service.DefaultCurrencyService;
 import feign.Feign;
@@ -11,13 +12,16 @@ import feign.RetryableException;
 
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.retry.support.RetryTemplate;
 
 
@@ -67,5 +71,16 @@ public class CurrencyClientAutoConfiguration {
         return false;
     }
 
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(HealthIndicator.class)
+    @ConditionalOnBean(CurrencyService.class)
+    @ConditionalOnProperty(prefix = "app.currency-client.health", name = "enabled", havingValue = "true", matchIfMissing = true)
+    static class CurrencyClientHealthConfiguration {
 
+        @Bean("currencyClientHealthIndicator")
+        @ConditionalOnMissingBean(name = "currencyClientHealthIndicator")
+        CurrencyClientHealthIndicator currencyClientHealthIndicator(CurrencyService currencyService) {
+            return new CurrencyClientHealthIndicator(currencyService);
+        }
+    }
 }

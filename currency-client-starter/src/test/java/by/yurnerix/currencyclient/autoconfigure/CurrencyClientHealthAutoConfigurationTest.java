@@ -8,6 +8,7 @@ import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.Status;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.cloud.openfeign.FeignAutoConfiguration;
 
 import java.math.BigDecimal;
 
@@ -16,7 +17,8 @@ import static org.mockito.Mockito.*;
 
 class CurrencyClientHealthAutoConfigurationTest {
 
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(CurrencyClientHealthAutoConfiguration.class));
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(CurrencyClientAutoConfiguration.CurrencyClientHealthConfiguration.class);
 
     @Test
     void shouldCreateUpHealthIndicator() {
@@ -96,6 +98,5 @@ class CurrencyClientHealthAutoConfigurationTest {
                 .withPropertyValues("app.currency-client.health.enabled=true")
                 .run(context -> assertThat(context).doesNotHaveBean(CurrencyClientHealthIndicator.class));
     }
-
 
 }

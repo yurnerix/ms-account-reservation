@@ -6,7 +6,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(name = "currencyApiClient", url = "${app.currency-client.base-url:" + "https://v6.exchangerate-api.com/v6}", configuration = CurrencyFeignConfiguration.class)
+@FeignClient(name = "currencyApiClient", url = "${app.currency-client.base-url}", configuration = CurrencyFeignConfiguration.class)
 public interface CurrencyApiClient {
 
     @GetMapping("/{apiKey}/pair/{fromCurrency}/{toCurrency}")

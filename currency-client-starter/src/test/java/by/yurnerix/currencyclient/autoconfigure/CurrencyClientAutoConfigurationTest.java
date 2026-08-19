@@ -19,7 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CurrencyClientAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-                    .withConfiguration(AutoConfigurations.of(FeignAutoConfiguration.class, CurrencyClientAutoConfiguration.class));
+            .withConfiguration(AutoConfigurations.of(FeignAutoConfiguration.class, CurrencyClientAutoConfiguration.class))
+            .withPropertyValues("app.currency-client.base-url=https://example.com/v6");
 
     @Test
     void shouldCreateCurrencyService() {
