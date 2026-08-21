@@ -3,6 +3,10 @@ package by.yurnerix.currencyclient.autoconfigure;
 import by.yurnerix.currencyclient.client.CurrencyApiClient;
 import by.yurnerix.currencyclient.config.CurrencyClientProperties;
 import by.yurnerix.currencyclient.service.CurrencyService;
+import by.yurnerix.currencyclient.health.CurrencyClientHealthIndicator;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -20,6 +24,7 @@ class CurrencyClientAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(FeignAutoConfiguration.class, CurrencyClientAutoConfiguration.class))
+            .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
             .withPropertyValues("app.currency-client.base-url=https://example.com/v6");
 
     @Test
@@ -41,6 +46,18 @@ class CurrencyClientAutoConfigurationTest {
 
                     assertThat(context)
                             .hasBean("currencyClientRetryTemplate");
+
+                    MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);
+
+                    Counter counter = meterRegistry
+                            .find("currency.exchange.rate.requests")
+                            .counter();
+
+                    assertThat(counter)
+                            .isNotNull();
+
+                    assertThat(counter.count())
+                            .isZero();
                 });
     }
 
@@ -141,5 +158,21 @@ class CurrencyClientAutoConfigurationTest {
         CurrencyService currencyService() {
             return ((fromCurrency, toCurrency) -> BigDecimal.TEN);
         }
+    }
+
+    @Test
+    void shouldCreateHealthIndicatorWithAutoConfiguredCurrencyService() {
+        contextRunner
+                .withPropertyValues("app.currency-client.enabled=true", "app.currency-client.health.enabled=true", "app.currency-client.api-key=test-api-key")
+                .run(context -> {
+                    assertThat(context)
+                            .hasSingleBean(CurrencyService.class);
+
+                    assertThat(context)
+                            .hasSingleBean(CurrencyClientHealthIndicator.class);
+
+                    assertThat(context)
+                            .hasBean("currencyClientHealthIndicator");
+                });
     }
 }

@@ -12,6 +12,22 @@ spring:
     password: ${DATABASE_PASSWORD:asterisk}
     driver-class-name: org.postgresql.Driver
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_TIMEOUT:2s}
+
+  cache:
+    type: redis
+    cache-names: exchangeRates
+    redis:
+      time-to-live: ${CACHE_EXCHANGE_RATES_TTL:30m}
+      cache-null-values: false
+
   liquibase:
     enabled: ${LIQUIBASE_ENABLED:true}
     change-log: ${LIQUIBASE_CHANGE_LOG:classpath:db/changelog/db.changelog-master.yaml}
@@ -44,7 +60,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info,threaddump}
+        include: ${MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:health,info,threaddump,metrics,prometheus}
 
   endpoint:
     health:
@@ -59,6 +75,11 @@ management:
 
     shutdown:
       access: none
+
+  prometheus:
+    metrics:
+      export:
+        enabled: ${MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED:true}
 
 app:
   currency-client:

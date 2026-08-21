@@ -11,10 +11,11 @@ import feign.FeignException;
 import feign.RetryableException;
 
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -37,6 +38,8 @@ import org.springframework.retry.support.RetryTemplate;
 @EnableConfigurationProperties(CurrencyClientProperties.class)
 public class CurrencyClientAutoConfiguration {
 
+    private static final String EXCHANGE_RATE_REQUESTS_METRIC = "currency.exchange.rate.requests";
+
     @Bean("currencyClientRetryTemplate")
     @ConditionalOnMissingBean(name = "currencyClientRetryTemplate")
     public RetryTemplate currencyClientRetryTemplate(CurrencyClientProperties properties) {
@@ -51,10 +54,18 @@ public class CurrencyClientAutoConfiguration {
                 .build();
     }
 
+    @Bean("currencyExchangeRateRequestsCounter")
+    @ConditionalOnMissingBean(name = "currencyExchangeRateRequestsCounter")
+    public Counter currencyExchangeRateRequestsCounter(MeterRegistry meterRegistry) {
+        return Counter.builder(EXCHANGE_RATE_REQUESTS_METRIC)
+                .description("Number of requests to the external currency API")
+                .register(meterRegistry);
+    }
+
     @Bean
     @ConditionalOnMissingBean(CurrencyService.class)
-    public CurrencyService currencyService(CurrencyApiClient currencyApiClient, CurrencyClientProperties properties, @Qualifier("currencyClientRetryTemplate") RetryTemplate retryTemplate) {
-        return new DefaultCurrencyService(currencyApiClient, properties, retryTemplate);
+    public CurrencyService currencyService(CurrencyApiClient currencyApiClient, CurrencyClientProperties properties, @Qualifier("currencyClientRetryTemplate") RetryTemplate retryTemplate, @Qualifier("currencyExchangeRateRequestsCounter") Counter currencyExchangeRateRequestsCounter) {
+        return new DefaultCurrencyService(currencyApiClient, properties, retryTemplate, currencyExchangeRateRequestsCounter);
     }
 
     private boolean isRetryable(Throwable throwable) {
@@ -73,7 +84,6 @@ public class CurrencyClientAutoConfiguration {
 
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass(HealthIndicator.class)
-    @ConditionalOnBean(CurrencyService.class)
     @ConditionalOnProperty(prefix = "app.currency-client.health", name = "enabled", havingValue = "true", matchIfMissing = true)
     static class CurrencyClientHealthConfiguration {
 
