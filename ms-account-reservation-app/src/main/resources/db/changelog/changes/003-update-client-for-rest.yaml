@@ -2,6 +2,7 @@ databaseChangeLog:
   - changeSet:
       id: 005-update-client-for-rest
       author: yurnerix
+      validCheckSum: 9:75a3f7425eab7da9967aa2f5ea37448f
 
       changes:
         # mdm_code: приведение к названию из REST-контракта

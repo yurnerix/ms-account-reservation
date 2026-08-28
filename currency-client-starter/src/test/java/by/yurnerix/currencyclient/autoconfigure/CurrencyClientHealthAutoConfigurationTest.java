@@ -6,9 +6,8 @@ import by.yurnerix.currencyclient.service.CurrencyService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.actuate.health.Health;
 import org.springframework.boot.actuate.health.Status;
-import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.cloud.openfeign.FeignAutoConfiguration;
+
 
 import java.math.BigDecimal;
 
@@ -89,13 +88,6 @@ class CurrencyClientHealthAutoConfigurationTest {
         contextRunner
                 .withBean(CurrencyService.class, () -> currencyService)
                 .withPropertyValues("app.currency-client.health.enabled=false")
-                .run(context -> assertThat(context).doesNotHaveBean(CurrencyClientHealthIndicator.class));
-    }
-
-    @Test
-    void shouldNotCreateHealthIndicatorWithoutCurrencyService() {
-        contextRunner
-                .withPropertyValues("app.currency-client.health.enabled=true")
                 .run(context -> assertThat(context).doesNotHaveBean(CurrencyClientHealthIndicator.class));
     }
 

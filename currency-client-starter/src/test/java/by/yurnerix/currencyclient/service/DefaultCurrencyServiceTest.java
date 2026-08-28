@@ -6,6 +6,8 @@ import by.yurnerix.currencyclient.config.CurrencyClientProperties;
 import by.yurnerix.currencyclient.dto.ExchangeRateResponse;
 import by.yurnerix.currencyclient.exception.CurrencyClientException;
 import feign.FeignException;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +19,7 @@ import org.springframework.retry.support.RetryTemplate;
 import java.math.BigDecimal;
 import java.time.Duration;
 
+
 import static by.yurnerix.currencyclient.util.MockUtils.readJson;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,6 +30,8 @@ class DefaultCurrencyServiceTest {
 
     private static final String API_KEY = "test-api-key";
 
+    private static final String EXCHANGE_RATE_REQUESTS_METRIC = "currency.exchange.rate.requests";
+
     @Mock
     private CurrencyApiClient currencyApiClient;
 
@@ -34,6 +39,9 @@ class DefaultCurrencyServiceTest {
 
     private CurrencyService currencyService;
 
+    private SimpleMeterRegistry meterRegistry;
+
+    private Counter currencyExchangeRateRequestsCounter;
 
     @BeforeEach
     void setUp() {
@@ -45,6 +53,12 @@ class DefaultCurrencyServiceTest {
         properties.getRetry().setMaxAttempts(1);
         properties.getRetry().setInitialInterval(Duration.ofMillis(1));
         properties.getRetry().setMaxInterval(Duration.ofMillis(2));
+
+        meterRegistry = new SimpleMeterRegistry();
+
+        currencyExchangeRateRequestsCounter = Counter.builder(EXCHANGE_RATE_REQUESTS_METRIC)
+                .description("Number of requests to the external currency API")
+                .register(meterRegistry);
 
         currencyService = createCurrencyService();
     }
@@ -62,6 +76,8 @@ class DefaultCurrencyServiceTest {
         assertThat(result).isEqualByComparingTo("1.1255");
 
         verify(currencyApiClient).getExchangeRate(API_KEY, "EUR", "USD");
+
+        assertThat(getExternalApiRequestCount()).isEqualTo(1.0);
     }
 
     @Test
@@ -72,6 +88,7 @@ class DefaultCurrencyServiceTest {
 
         verifyNoInteractions(currencyApiClient);
 
+        assertThat(getExternalApiRequestCount()).isZero();
     }
 
     @Test
@@ -107,6 +124,8 @@ class DefaultCurrencyServiceTest {
         assertThatThrownBy(() -> serviceWithRetry.getExchangeRate("EUR", "USD")).isSameAs(exception);
 
         verify(currencyApiClient, times(3)).getExchangeRate(API_KEY, "EUR", "USD");
+
+        assertThat(getExternalApiRequestCount()).isEqualTo(3.0);
     }
 
     @Test
@@ -122,6 +141,8 @@ class DefaultCurrencyServiceTest {
         assertThatThrownBy(() -> serviceWithRetry.getExchangeRate("EUR", "USD")).isSameAs(exception);
 
         verify(currencyApiClient, times(1)).getExchangeRate(API_KEY, "EUR", "USD");
+
+        assertThat(getExternalApiRequestCount()).isEqualTo(1.0);
     }
 
     @Test
@@ -131,6 +152,8 @@ class DefaultCurrencyServiceTest {
                 .hasMessageContaining("exactly three Latin letters");
 
         verifyNoInteractions(currencyApiClient);
+
+        assertThat(getExternalApiRequestCount()).isZero();
     }
 
     @Test
@@ -142,6 +165,8 @@ class DefaultCurrencyServiceTest {
                 .hasMessageContaining("API key is not configured");
 
         verifyNoInteractions(currencyApiClient);
+
+        assertThat(getExternalApiRequestCount()).isZero();
     }
 
     private CurrencyService createCurrencyService() {
@@ -149,7 +174,14 @@ class DefaultCurrencyServiceTest {
 
         RetryTemplate retryTemplate = autoConfiguration.currencyClientRetryTemplate(properties);
 
-        return new DefaultCurrencyService(currencyApiClient, properties, retryTemplate);
+        return new DefaultCurrencyService(currencyApiClient, properties, retryTemplate, currencyExchangeRateRequestsCounter);
+    }
+
+    private double getExternalApiRequestCount() {
+        return meterRegistry
+                .get(EXCHANGE_RATE_REQUESTS_METRIC)
+                .counter()
+                .count();
     }
 
     private FeignException createFeignException(int status) {

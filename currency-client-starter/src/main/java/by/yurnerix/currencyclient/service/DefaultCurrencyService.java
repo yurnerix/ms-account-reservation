@@ -4,8 +4,10 @@ import by.yurnerix.currencyclient.client.CurrencyApiClient;
 import by.yurnerix.currencyclient.config.CurrencyClientProperties;
 import by.yurnerix.currencyclient.dto.ExchangeRateResponse;
 import by.yurnerix.currencyclient.exception.CurrencyClientException;
+import io.micrometer.core.instrument.Counter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.util.StringUtils;
 
@@ -16,6 +18,7 @@ import java.util.regex.Pattern;
 @Slf4j
 @RequiredArgsConstructor
 public class DefaultCurrencyService implements CurrencyService {
+
     private static final String SUCCESS_RESULT = "success";
 
     private static final Pattern CURRENCY_CODE_PATTERN = Pattern.compile("^[A-Z]{3}$");
@@ -26,7 +29,15 @@ public class DefaultCurrencyService implements CurrencyService {
 
     private final RetryTemplate retryTemplate;
 
+    private final Counter currencyExchangeRateRequestsCounter;
+
+
     @Override
+    @Cacheable(
+            cacheNames = "exchangeRates",
+            key = "(#fromCurrency.trim() + ':' + #toCurrency.trim()).toUpperCase(T(java.util.Locale).ROOT)",
+            condition = "#fromCurrency != null && #toCurrency != null"
+    )
     public BigDecimal getExchangeRate(String fromCurrency, String toCurrency) {
         String from = normalizeCurrencyCode(fromCurrency);
         String to = normalizeCurrencyCode(toCurrency);
@@ -49,6 +60,8 @@ public class DefaultCurrencyService implements CurrencyService {
             if (attempt > 1) {
                 log.warn("Retrying currency API request: " + "from={}, to={}, attempt={}", from, to, attempt);
             }
+
+            currencyExchangeRateRequestsCounter.increment();
 
             return currencyApiClient.getExchangeRate(properties.getApiKey(), from, to);
         });
