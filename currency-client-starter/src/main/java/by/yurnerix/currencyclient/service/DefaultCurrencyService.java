@@ -33,8 +33,9 @@ public class DefaultCurrencyService implements CurrencyService {
 
 
     @Override
-    @Cacheable(cacheNames = "exchangeRates",
-            key = "#fromCurrency.trim().toUpperCase(T(java.util.Locale).ROOT)" + " + ':' + " + "#toCurrency.trim().toUpperCase(T(java.util.Locale).ROOT)",
+    @Cacheable(
+            cacheNames = "exchangeRates",
+            key = "(#fromCurrency.trim() + ':' + #toCurrency.trim()).toUpperCase(T(java.util.Locale).ROOT)",
             condition = "#fromCurrency != null && #toCurrency != null"
     )
     public BigDecimal getExchangeRate(String fromCurrency, String toCurrency) {
