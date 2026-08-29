@@ -13,6 +13,9 @@ tags:
   - name: Clients
     description: Операции для работы с клиентами
 
+  - name: ClientReports
+    description: Асинхронное получение сводной информации о клиентах
+
 security:
   - bearerAuth: []
 
@@ -223,6 +226,41 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/v1/clients/{clientId}/report:
+
+    parameters:
+
+      - $ref: '#/components/parameters/ClientIdParameter'
+
+    get:
+      tags:
+        - ClientReports
+      summary: Получение сводки по клиенту и курсам валют
+      description: >
+        Параллельно получает данные клиента и курсы валют
+        USD/RUB и EUR/RUB
+      operationId: getClientReport
+
+      responses:
+
+        '200':
+          description: Сводка успешно сформирована
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientReportResponse'
+
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
+
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+
+
 components:
 
   securitySchemes:
@@ -327,6 +365,17 @@ components:
             errorDescription: Произошла внутренняя ошибка приложения
             statusCode: 500
 
+    GatewayTimeout:
+      description: Не удалось сформировать сводку за отведённое время
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            errorCode: CLIENT_REPORT_TIMEOUT
+            errorDescription: Превышено время ожидания формирования сводки клиента
+            statusCode: 504
+
   schemas:
 
     ClientStatus:
@@ -346,6 +395,7 @@ components:
         - CLIENT_NOT_FOUND
         - CLIENT_ALREADY_EXISTS
         - CLIENT_HAS_ACTIVE_ACCOUNTS
+        - CLIENT_REPORT_TIMEOUT
         - INTERNAL_ERROR
       example: CLIENT_NOT_FOUND
 
@@ -633,6 +683,28 @@ components:
           type: boolean
           description: Признак наличия счетов. На текущем этапе всегда false
           example: false
+
+    ClientReportResponse:
+      type: object
+      description: Сводная информация о клиенте и курсах валют
+
+      required:
+        - client
+        - exchangeRates
+
+      properties:
+
+        client:
+          $ref: '#/components/schemas/ClientDetailsResponse'
+
+        exchangeRates:
+          type: object
+          description: Курсы валют, где ключ имеет формат FROM/TO
+          additionalProperties:
+            type: number
+          example:
+            USD/RUB: 91.25
+            EUR/RUB: 99.40
 
     ClientSummary:
       type: object

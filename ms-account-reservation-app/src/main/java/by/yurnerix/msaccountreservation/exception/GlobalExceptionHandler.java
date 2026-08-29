@@ -159,6 +159,19 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ClientReportTimeoutException.class)
+    public ResponseEntity<ErrorResponseDto> handleClientReportTimeout(ClientReportTimeoutException exception) {
+        log.warn(
+                "Client report generation timed out: {}",
+                exception.getMessage()
+        );
+
+        return buildErrorResponse(
+                HttpStatus.GATEWAY_TIMEOUT,
+                ErrorCodeDto.CLIENT_REPORT_TIMEOUT,
+                "Превышено время ожидания формирования сводки клиента"
+        );
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDto> handleUnexpectedException(Exception exception) {
