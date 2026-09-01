@@ -1,13 +1,14 @@
 package by.yurnerix.msaccountreservation.integration;
 
-import by.yurnerix.currencyclient.service.CurrencyService;
+import by.yurnerix.currencyclient.dto.ExchangeRateResponse;
 import com.github.database.rider.core.api.dataset.DataSet;
 import com.github.database.rider.junit5.api.DBRider;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.math.BigDecimal;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,15 +29,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @DBRider
-class ClientReportApiIntegrationTest extends AbstractIntegrationTest {
+class ClientReportApiIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
 
     private static final UUID CLIENT_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-    @Autowired
-    private MockMvc mockMvc;
+    private static final String API_KEY = "test-api-key";
+    private static final String CACHE_NAME = "exchangeRates";
 
-    @MockitoBean
-    private CurrencyService currencyService;
+    @Autowired
+    private CacheManager cacheManager;
+
+    @BeforeEach
+    void clearExchangeRatesCache() {
+        Cache cache = cacheManager.getCache(CACHE_NAME);
+
+        assertNotNull(cache);
+
+        cache.clear();
+    }
 
     @Test
     @DataSet(
@@ -52,18 +63,18 @@ class ClientReportApiIntegrationTest extends AbstractIntegrationTest {
     void getClientReportShouldReturnClientAndExchangeRates() throws Exception {
         Queue<String> currencyTaskThreads = new ConcurrentLinkedQueue<>();
 
-        when(currencyService.getExchangeRate("USD", "RUB"))
+        when(currencyApiClient.getExchangeRate(API_KEY, "USD", "RUB"))
                 .thenAnswer(invocation -> {
                     currencyTaskThreads.add(Thread.currentThread().getName());
 
-                    return new BigDecimal("91.25");
+                    return createExchangeRateResponse("USD", "RUB", "91.25");
                 });
 
-        when(currencyService.getExchangeRate("EUR", "RUB"))
+        when(currencyApiClient.getExchangeRate(API_KEY, "EUR", "RUB"))
                 .thenAnswer(invocation -> {
                     currencyTaskThreads.add(Thread.currentThread().getName());
 
-                    return new BigDecimal("99.40");
+                    return createExchangeRateResponse("EUR", "RUB", "99.40");
                 });
 
         MvcResult mvcResult = mockMvc
@@ -86,11 +97,11 @@ class ClientReportApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.exchangeRates['USD/RUB']").value(91.25))
                 .andExpect(jsonPath("$.exchangeRates['EUR/RUB']").value(99.40));
 
-        verify(currencyService)
-                .getExchangeRate("USD", "RUB");
+        verify(currencyApiClient)
+                .getExchangeRate(API_KEY,"USD", "RUB");
 
-        verify(currencyService)
-                .getExchangeRate("EUR", "RUB");
+        verify(currencyApiClient)
+                .getExchangeRate(API_KEY,"EUR", "RUB");
 
         assertEquals(2, currencyTaskThreads.size());
 
@@ -99,6 +110,17 @@ class ClientReportApiIntegrationTest extends AbstractIntegrationTest {
                         .allMatch(threadName -> threadName.startsWith("client-report-")),
                 "Валютные запросы должны выполняться " + "в пуле clientReportExecutor"
         );
+    }
+
+    private ExchangeRateResponse createExchangeRateResponse(String baseCurrency, String targetCurrency, String rate) {
+        ExchangeRateResponse response = new ExchangeRateResponse();
+
+        response.setResult("success");
+        response.setBaseCode(baseCurrency);
+        response.setTargetCode(targetCurrency);
+        response.setConversionRate(new BigDecimal(rate));
+
+        return response;
     }
 
 }

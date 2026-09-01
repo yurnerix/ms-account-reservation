@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class CurrencyClientStarterIntegrationTest extends AbstractIntegrationTest {
+class CurrencyClientStarterIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
 
     @Autowired
     private CurrencyService currencyService;

@@ -4,17 +4,11 @@ import by.yurnerix.msaccountreservation.exception.ClientAlreadyExistsException;
 import by.yurnerix.msaccountreservation.exception.ClientHasActiveAccountException;
 import by.yurnerix.msaccountreservation.exception.ClientNotFoundException;
 import by.yurnerix.msaccountreservation.generated.dto.*;
-import by.yurnerix.msaccountreservation.service.ClientService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -27,17 +21,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.hamcrest.Matchers.endsWith;
 
-@WebMvcTest(ClientController.class)
-class ClientControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockitoBean
-    private ClientService clientService;
+class ClientControllerTest extends AbstractControllerTest {
 
     private UUID clientId;
     private OffsetDateTime createdAt;
