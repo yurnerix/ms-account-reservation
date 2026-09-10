@@ -1,13 +1,18 @@
 package by.yurnerix.msaccountreservation.integration;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
+
+import java.util.stream.Stream;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -27,9 +32,12 @@ public abstract class AbstractIntegrationTest {
                     .withExposedPorts(REDIS_PORT);
 
     static {
-        POSTGRESQL_CONTAINER.start();
-        REDIS_CONTAINER.start();
+        Startables.deepStart(Stream.of(POSTGRESQL_CONTAINER, REDIS_CONTAINER))
+                .join();
     }
+
+    @Autowired
+    protected MockMvc mockMvc;
 
     @DynamicPropertySource
     static void registerContainerProperties(DynamicPropertyRegistry registry) {

@@ -11,8 +11,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -24,8 +22,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
-@TestPropertySource(properties = "app.currency-client.api-key=test-api-key")
-class CurrencyServiceRedisCacheIntegrationTest extends AbstractIntegrationTest {
+class CurrencyServiceRedisCacheIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
 
     private static final String API_KEY = "test-api-key";
 
@@ -34,9 +31,6 @@ class CurrencyServiceRedisCacheIntegrationTest extends AbstractIntegrationTest {
     private static final String REDIS_KEY = "exchangeRates::USD:EUR";
 
     private static final long EXPECTED_TTL_SECONDS = Duration.ofMinutes(30).toSeconds();
-
-    @MockitoBean
-    private CurrencyApiClient currencyApiClient;
 
     @Autowired
     private CurrencyService currencyService;

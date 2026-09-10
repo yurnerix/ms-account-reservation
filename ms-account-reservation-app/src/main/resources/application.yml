@@ -80,8 +80,13 @@ management:
     metrics:
       export:
         enabled: ${MANAGEMENT_PROMETHEUS_METRICS_EXPORT_ENABLED:true}
-
 app:
+  async:
+    core-pool-size: ${ASYNC_CORE_POOL_SIZE:3}
+    max-pool-size: ${ASYNC_MAX_POOL_SIZE:6}
+    queue-capacity: ${ASYNC_QUEUE_CAPACITY:100}
+    task-timeout: ${ASYNC_TASK_TIMEOUT:5s}
+
   currency-client:
     enabled: ${CURRENCY_CLIENT_ENABLED:true}
     base-url: ${CURRENCY_CLIENT_BASE_URL:https://v6.exchangerate-api.com/v6}

@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -32,13 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @DBRider
 @Transactional
-class ClientApiIntegrationTest extends AbstractIntegrationTest {
+class ClientApiIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
 
     @Autowired
     private AccountStatusRepository accountStatusRepository;
-
-    @Autowired
-    private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
