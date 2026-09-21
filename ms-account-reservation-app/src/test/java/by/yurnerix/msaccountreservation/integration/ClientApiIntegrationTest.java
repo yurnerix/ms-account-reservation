@@ -5,15 +5,15 @@ import by.yurnerix.msaccountreservation.entity.AccountStatus;
 import by.yurnerix.msaccountreservation.entity.Client;
 import by.yurnerix.msaccountreservation.entity.ClientStatus;
 import by.yurnerix.msaccountreservation.entity.AccountStatusName;
-import by.yurnerix.msaccountreservation.generated.dto.ClientResponseDto;
-import by.yurnerix.msaccountreservation.generated.dto.CreateClientRequestDto;
-import by.yurnerix.msaccountreservation.generated.dto.UpdateClientRequestDto;
+import by.yurnerix.msaccountreservation.generated.dto.*;
 import by.yurnerix.msaccountreservation.repository.AccountRepository;
 import by.yurnerix.msaccountreservation.repository.AccountStatusRepository;
 import by.yurnerix.msaccountreservation.repository.ClientRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.database.rider.core.api.dataset.DataSet;
 import com.github.database.rider.junit5.api.DBRider;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +24,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -44,6 +45,9 @@ class ClientApiIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
 
     @Autowired
     private AccountRepository accountRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Test
     void contextShouldStartWithMigratedDatabase() {
@@ -190,7 +194,9 @@ class ClientApiIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.createdAt").isNotEmpty())
                 .andExpect(jsonPath("$.updatedAt").isNotEmpty())
-                .andExpect(jsonPath("$.hasAccounts").value(false));
+                .andExpect(jsonPath("$.hasAccounts").value(false))
+                .andExpect(jsonPath("$.accounts").isArray())
+                .andExpect(jsonPath("$.accounts").isEmpty());
     }
 
     private Client saveClient(Long mdmId) {
@@ -472,5 +478,208 @@ class ClientApiIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
         );
     }
 
+    private Account saveAccount(Client client, AccountStatusName statusName) {
+        AccountStatus accountStatus = accountStatusRepository
+                .findByName(statusName)
+                .orElseThrow();
+
+        Account account = new Account(accountStatus, client, "CURRENT", "RUB");
+
+        Account savedAccount = accountRepository.save(account);
+        client.getAccounts().add(account);
+
+        return savedAccount;
+    }
+
+    @Test
+    void searchClientsShouldReturnAccountCountsAndStatuses() throws Exception {
+        Client withAccounts = saveClient(8800000001L, "Анна", "UPG8Page");
+
+        saveAccount(withAccounts, AccountStatusName.NEW);
+        saveAccount(withAccounts, AccountStatusName.IN_CREATION);
+        saveAccount(withAccounts, AccountStatusName.CREATED);
+        saveAccount(withAccounts, AccountStatusName.CANCELLED);
+        saveAccount(withAccounts, AccountStatusName.CLOSED);
+
+        Client withoutAccounts = saveClient(8800000002L, "Борис", "UPG8Page");
+        withoutAccounts.setStatus(ClientStatus.BLOCKED);
+
+        Client deletedClient = saveClient(8800000003L, "Вера", "UPG8Page");
+        deletedClient.setStatus(ClientStatus.DELETED);
+        saveAccount(deletedClient, AccountStatusName.CREATED);
+
+        UUID withAccountsId = withAccounts.getId();
+        UUID withoutAccountsId = withoutAccounts.getId();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/v1/clients")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .param("lastName", "UPG8Page")
+                        .accept(MediaType.APPLICATION_JSON))
+
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+
+                .andExpect(jsonPath("$.content[*].id")
+                        .value(containsInAnyOrder(withAccountsId.toString(), withoutAccountsId.toString())))
+
+                .andExpect(jsonPath("$.content[?(@.id == '%s')].status"
+                        .formatted(withAccountsId))
+                        .value(containsInAnyOrder("ACTIVE")))
+
+                .andExpect(jsonPath("$.content[?(@.id == '%s')].activeAccountsCount"
+                        .formatted(withAccountsId))
+                        .value(containsInAnyOrder(3)))
+
+                .andExpect(jsonPath("$.content[?(@.id == '%s')].status"
+                        .formatted(withoutAccountsId))
+                        .value(containsInAnyOrder("BLOCKED")))
+
+                .andExpect(jsonPath("$.content[?(@.id == '%s')].activeAccountsCount"
+                        .formatted(withoutAccountsId))
+                        .value(containsInAnyOrder(0)))
+
+                .andExpect(jsonPath("$.pageable.totalElements").value(2))
+                .andExpect(jsonPath("$.pageable.totalPages").value(1));
+    }
+
+    @Test
+    void searchClientsShouldReturnZeroWhenAllAccountsAreInactive() throws Exception {
+        Client client = saveClient(8800000004L, "Глеб", "UPG8Inactive");
+
+        saveAccount(client, AccountStatusName.CANCELLED);
+        saveAccount(client, AccountStatusName.CLOSED);
+
+        UUID clientId = client.getId();
+        Long mdmId = client.getMdmId();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(get("/api/v1/clients")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .param("mdmId", mdmId.toString())
+                        .accept(MediaType.APPLICATION_JSON))
+
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id")
+                        .value(clientId.toString()))
+                .andExpect(jsonPath("$.content[0].status")
+                        .value("ACTIVE"))
+                .andExpect(jsonPath("$.content[0].activeAccountsCount")
+                        .value(0))
+                .andExpect(jsonPath("$.pageable.totalElements").value(1));
+    }
+
+    @Test
+    void getClientShouldReturnPersistedAccountsWithDetails() throws Exception {
+        Client client = saveClient(8810000001L, "Анна", "UPG8Details");
+
+        Account createdAccount = saveAccount(client, AccountStatusName.CREATED);
+        createdAccount.setAccountNumber("00000000000000000001");
+        createdAccount.setCurrencyCode("USD");
+        createdAccount.setBalance(new BigDecimal("1234.5678"));
+
+        Account closedAccount = saveAccount(client, AccountStatusName.CLOSED);
+        closedAccount.setAccountNumber("00000000000000000002");
+        closedAccount.setAccountType("SAVINGS");
+        closedAccount.setCurrencyCode("EUR");
+        closedAccount.setBalance(new BigDecimal("0.0000"));
+
+        Client anotherClient = saveClient(8810000002L, "Борис", "UPG8Another");
+        saveAccount(anotherClient, AccountStatusName.CREATED);
+
+        UUID clientId = client.getId();
+        UUID createdAccountId = createdAccount.getId();
+        UUID closedAccountId = closedAccount.getId();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        String responseBody = mockMvc.perform(get("/api/v1/clients/{clientId}", clientId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(clientId.toString()))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.hasAccounts").value(true))
+                .andExpect(jsonPath("$.accounts.length()").value(2))
+                .andExpect(jsonPath("$.accounts[*].id")
+                        .value(containsInAnyOrder(createdAccountId.toString(), closedAccountId.toString())))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        ClientDetailsResponseDto response = objectMapper.readValue(responseBody, ClientDetailsResponseDto.class);
+
+        AccountResponseDto created = response.getAccounts().stream()
+                .filter(account -> createdAccountId.equals(account.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        AccountResponseDto closed = response.getAccounts().stream()
+                .filter(account -> closedAccountId.equals(account.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertAll(
+                () -> assertEquals("00000000000000000001", created.getAccountNumber()),
+                () -> assertEquals("CURRENT", created.getAccountType()),
+                () -> assertEquals("USD", created.getCurrencyCode()),
+                () -> assertEquals(AccountStatusDto.CREATED, created.getStatus()),
+
+                () -> assertEquals("00000000000000000002", closed.getAccountNumber()),
+                () -> assertEquals("SAVINGS", closed.getAccountType()),
+                () -> assertEquals("EUR", closed.getCurrencyCode()),
+                () -> assertEquals(AccountStatusDto.CLOSED, closed.getStatus())
+        );
+
+        assertNotNull(created.getBalance());
+        assertNotNull(closed.getBalance());
+
+        assertEquals(0, new BigDecimal("1234.5678").compareTo(created.getBalance()));
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(closed.getBalance()));
+    }
+
+    @Test
+    void getClientShouldPreserveUnknownAccountDetails() throws Exception {
+        Client client = saveClient(8810000003L, "Вера", "UPG8Unknown");
+
+        Account account = saveAccount(client, AccountStatusName.CLOSED);
+
+        UUID clientId = client.getId();
+        UUID accountId = account.getId();
+
+        entityManager.flush();
+        entityManager.clear();
+
+        String responseBody = mockMvc.perform(
+                get("/api/v1/clients/{clientId}", clientId)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasAccounts").value(true))
+                .andExpect(jsonPath("$.accounts.length()").value(1))
+                .andExpect(jsonPath("$.accounts[0].id")
+                        .value(accountId.toString()))
+                .andExpect(jsonPath("$.accounts[0].status")
+                        .value("CLOSED"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        ClientDetailsResponseDto response = objectMapper.readValue(responseBody, ClientDetailsResponseDto.class);
+
+        AccountResponseDto accountResponse = response.getAccounts().getFirst();
+
+        assertAll(
+                () -> assertNull(accountResponse.getAccountNumber()),
+                () -> assertNull(accountResponse.getBalance())
+        );
+    }
 
 }

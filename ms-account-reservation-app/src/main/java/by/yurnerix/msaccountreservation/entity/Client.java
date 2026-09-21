@@ -5,6 +5,8 @@ import lombok.*;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -52,6 +54,10 @@ public class Client {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ClientStatus status = ClientStatus.ACTIVE;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "client", fetch = FetchType.LAZY)
+    private List<Account> accounts = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

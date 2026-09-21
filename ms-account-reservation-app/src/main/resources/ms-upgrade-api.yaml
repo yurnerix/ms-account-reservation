@@ -602,6 +602,63 @@ components:
           description: Время последнего обновления клиента
           example: '2024-01-15T10:30:00Z'
 
+    AccountStatus:
+      type: string
+      description: Статус счёта
+      enum:
+        - NEW
+        - IN_CREATION
+        - CREATED
+        - CANCELLED
+        - CLOSED
+      example: CREATED
+
+    AccountResponse:
+      type: object
+      description: Информация о счёте клиента
+
+      required:
+        - id
+        - accountType
+        - currencyCode
+        - status
+
+      properties:
+
+        id:
+          type: string
+          format: uuid
+          description: Внутренний идентификатор счёта
+          example: '22222222-2222-4222-8222-222222222222'
+
+        accountNumber:
+          type: string
+          maxLength: 34
+          nullable: true
+          description: Номер счёта. null, если номер ещё не известен
+          example: '00000000000000000001'
+
+        accountType:
+          type: string
+          description: Тип счёта
+          example: CURRENT
+
+        currencyCode:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: Код валюты счёта
+          example: RUB
+
+        balance:
+          type: number
+          nullable: true
+          description: Баланс в валюте счёта с точностью до четырёх знаков после запятой. null, если баланс неизвестен
+          example: 1234.5678
+
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+
     ClientDetailsResponse:
       type: object
       description: Подробная информация о клиенте
@@ -618,6 +675,7 @@ components:
         - createdAt
         - updatedAt
         - hasAccounts
+        - accounts
 
       properties:
 
@@ -681,8 +739,14 @@ components:
 
         hasAccounts:
           type: boolean
-          description: Признак наличия счетов. На текущем этапе всегда false
-          example: false
+          description: Есть ли у клиента хотя бы один счёт независимо от его статуса
+          example: true
+
+        accounts:
+          type: array
+          description: Все счета клиента, включая закрытые и аннулированные
+          items:
+            $ref: '#/components/schemas/AccountResponse'
 
     ClientReportResponse:
       type: object
@@ -706,6 +770,7 @@ components:
             USD/RUB: 91.25
             EUR/RUB: 99.40
 
+
     ClientSummary:
       type: object
       description: Краткая информация о клиенте для поиска
@@ -716,6 +781,7 @@ components:
         - firstName
         - lastName
         - status
+        - activeAccountsCount
 
       properties:
 
@@ -744,6 +810,13 @@ components:
 
         status:
           $ref: '#/components/schemas/ClientStatus'
+
+        activeAccountsCount:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Количество счетов в статусах NEW, IN_CREATION или CREATED
+          example: 2
 
     PageMetadata:
       type: object
