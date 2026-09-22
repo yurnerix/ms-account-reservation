@@ -10,3 +10,6 @@ databaseChangeLog:
 
   - include:
       file: db/changelog/changes/004-add-client-search-index.yaml
+
+  - include:
+      file: db/changelog/changes/005-add-account-details.yaml

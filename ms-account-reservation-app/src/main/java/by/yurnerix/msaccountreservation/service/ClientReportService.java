@@ -6,7 +6,6 @@ import by.yurnerix.msaccountreservation.config.ClientReportAsyncConfiguration;
 import by.yurnerix.msaccountreservation.exception.ClientReportTimeoutException;
 import by.yurnerix.msaccountreservation.generated.dto.ClientDetailsResponseDto;
 import by.yurnerix.msaccountreservation.generated.dto.ClientReportResponseDto;
-import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,12 +44,9 @@ public class ClientReportService {
                 clientId
         );
 
-        return ClientReportTasks.builder()
-                .client(submitTask(clientId, "client", () -> clientService.getClient(clientId)))
-                .usdRub(submitTask(clientId, USD_RUB_PAIR, () -> currencyService.getExchangeRate(USD, RUB)))
-                .eurRub(submitTask(clientId, EUR_RUB_PAIR, () -> currencyService.getExchangeRate(EUR, RUB)))
-                .build()
-                .combine()
+        return combineReport(submitTask(clientId, "client", () -> clientService.getClient(clientId)),
+                submitTask(clientId, USD_RUB_PAIR, () -> currencyService.getExchangeRate(USD, RUB)),
+                submitTask(clientId, EUR_RUB_PAIR, () -> currencyService.getExchangeRate(EUR, RUB)))
                 .orTimeout(asyncProperties.getTaskTimeout().toMillis(), TimeUnit.MILLISECONDS)
                 .handle((report, throwable) -> handleResult(clientId, report, throwable));
     }
@@ -108,16 +104,8 @@ public class ClientReportService {
         return current;
     }
 
-    @Builder
-    private static final class ClientReportTasks {
-
-        private final CompletableFuture<ClientDetailsResponseDto> client;
-        private final CompletableFuture<BigDecimal> usdRub;
-        private final CompletableFuture<BigDecimal> eurRub;
-
-        private CompletableFuture<ClientReportResponseDto> combine() {
-            return client.thenCombine(usdRub.thenCombine(eurRub, ClientReportService::createExchangeRates), ClientReportService::createReport);
-        }
+    private CompletableFuture<ClientReportResponseDto> combineReport(CompletableFuture<ClientDetailsResponseDto> client, CompletableFuture<BigDecimal> usdRub, CompletableFuture<BigDecimal> eurRub) {
+        return client.thenCombine(usdRub.thenCombine(eurRub, ClientReportService::createExchangeRates), ClientReportService::createReport);
     }
 
     private static Map<String, BigDecimal> createExchangeRates(BigDecimal usdRub, BigDecimal eurRub) {

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter
@@ -32,6 +33,11 @@ public class Account {
     @Column(name = "currency_code", nullable = false, length = 3)
     private String currencyCode;
 
+    @Column(name = "account_number", length = 34)
+    private String accountNumber;
+
+    @Column(name = "balance", precision = 19, scale = 4)
+    private BigDecimal balance;
 
     public Account(AccountStatus status, Client client, String accountType, String currencyCode) {
         this.status = status;

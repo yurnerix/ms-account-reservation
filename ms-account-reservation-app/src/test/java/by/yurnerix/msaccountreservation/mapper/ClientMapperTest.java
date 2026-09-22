@@ -1,7 +1,6 @@
 package by.yurnerix.msaccountreservation.mapper;
 
-import by.yurnerix.msaccountreservation.entity.Client;
-import by.yurnerix.msaccountreservation.entity.ClientStatus;
+import by.yurnerix.msaccountreservation.entity.*;
 import by.yurnerix.msaccountreservation.generated.dto.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +9,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.mapstruct.factory.Mappers;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -132,8 +132,7 @@ class ClientMapperTest {
 
     @Test
     void toDetailsResponseShouldMapClientAndSetHasAccountsFalse() {
-        ClientDetailsResponseDto result =
-                clientMapper.toDetailsResponse(client);
+        ClientDetailsResponseDto result = clientMapper.toDetailsResponse(client);
 
         assertAll(
                 () -> assertEquals(clientId, result.getId()),
@@ -151,10 +150,18 @@ class ClientMapperTest {
                 () -> assertEquals(updateAt, result.getUpdatedAt()),
                 () -> assertFalse(result.getHasAccounts())
         );
+
+        assertNotNull(result.getAccounts());
+        assertTrue(result.getAccounts().isEmpty());
     }
 
     @Test
     void toPageResponseShouldMapContentAndPageMetadata() {
+
+        addAccount(AccountStatusName.NEW);
+        addAccount(AccountStatusName.CREATED);
+        addAccount(AccountStatusName.CLOSED);
+
         Page<Client> page = new PageImpl<>(List.of(client), PageRequest.of(1, 2), 5);
 
         ClientPageResponseDto result = clientMapper.toPageResponse(page);
@@ -163,6 +170,8 @@ class ClientMapperTest {
         assertEquals(1, result.getContent().size());
 
         ClientSummaryDto summary = result.getContent().getFirst();
+
+        assertEquals(Long.valueOf(2L), summary.getActiveAccountsCount());
 
         assertAll(
                 () -> assertEquals(clientId, summary.getId()),
@@ -219,4 +228,119 @@ class ClientMapperTest {
                 () -> assertNull(result.getStatus())
         );
     }
+
+    private void addAccount(AccountStatusName statusName) {
+        AccountStatus status = AccountStatus.builder()
+                .name(statusName)
+                .build();
+
+        Account account = new Account(
+                status,
+                client,
+                "CURRENT",
+                "RUB"
+        );
+
+        account.setId(UUID.randomUUID());
+        client.getAccounts().add(account);
+    }
+
+    @Test
+    void toSummaryShouldCountActiveAccountsAndMapClientStatus() {
+        client.setStatus(ClientStatus.BLOCKED);
+
+        addAccount(AccountStatusName.NEW);
+        addAccount(AccountStatusName.IN_CREATION);
+        addAccount(AccountStatusName.CREATED);
+        addAccount(AccountStatusName.CANCELLED);
+        addAccount(AccountStatusName.CLOSED);
+
+        ClientSummaryDto result = clientMapper.toSummary(client);
+
+        assertAll(
+                () -> assertEquals(clientId, result.getId()),
+                () -> assertEquals(ClientStatusDto.BLOCKED, result.getStatus()),
+                () -> assertEquals(Long.valueOf(3L), result.getActiveAccountsCount())
+        );
+    }
+
+    @Test
+    void toSummaryShouldReturnZeroWhenClientHasNoAccounts() {
+        ClientSummaryDto result = clientMapper.toSummary(client);
+
+        assertAll(
+                () -> assertEquals(ClientStatusDto.ACTIVE, result.getStatus()),
+                () -> assertEquals(Long.valueOf(0L), result.getActiveAccountsCount())
+        );
+    }
+
+    @Test
+    void toSummaryShouldReturnZeroWhenAllAccountsAreInactive() {
+        addAccount(AccountStatusName.CANCELLED);
+        addAccount(AccountStatusName.CLOSED);
+
+        ClientSummaryDto result = clientMapper.toSummary(client);
+
+        assertEquals(Long.valueOf(0L), result.getActiveAccountsCount());
+    }
+
+    @Test
+    void toDetailsResponseShouldMapAccountsWithTheirStatuses() {
+        addAccount(AccountStatusName.CREATED);
+        addAccount(AccountStatusName.CLOSED);
+
+        Account createdAccount = client.getAccounts().get(0);
+        createdAccount.setCurrencyCode("USD");
+        createdAccount.setAccountNumber("00000000000000000001");
+        createdAccount.setBalance(new BigDecimal("1234.5678"));
+
+        Account closedAccount = client.getAccounts().get(1);
+        closedAccount.setAccountType("SAVINGS");
+        closedAccount.setCurrencyCode("EUR");
+
+        ClientDetailsResponseDto result = clientMapper.toDetailsResponse(client);
+
+        assertTrue(result.getHasAccounts());
+        assertNotNull(result.getAccounts());
+        assertEquals(2, result.getAccounts().size());
+
+        AccountResponseDto created = result.getAccounts().get(0);
+        AccountResponseDto closed = result.getAccounts().get(1);
+
+        assertAll(
+                () -> assertEquals(clientId, result.getId()),
+                () -> assertEquals(ClientStatusDto.ACTIVE, result.getStatus()),
+
+                () -> assertEquals(createdAccount.getId(), created.getId()),
+                () -> assertEquals("CURRENT", created.getAccountType()),
+                () -> assertEquals("USD", created.getCurrencyCode()),
+                () -> assertEquals(AccountStatusDto.CREATED, created.getStatus()),
+                () -> assertEquals("00000000000000000001", created.getAccountNumber()),
+
+                () -> assertEquals(closedAccount.getId(), closed.getId()),
+                () -> assertEquals("SAVINGS", closed.getAccountType()),
+                () -> assertEquals("EUR", closed.getCurrencyCode()),
+                () -> assertEquals(AccountStatusDto.CLOSED, closed.getStatus()),
+                () -> assertNull(closed.getAccountNumber()),
+                () -> assertNull(closed.getBalance())
+        );
+
+        assertNotNull(created.getBalance());
+
+        assertEquals(0, new BigDecimal("1234.5678").compareTo(created.getBalance()));
+    }
+
+    @Test
+    void toDetailsResponseShouldHaveAccountsEvenWhenAccountIsClosed() {
+        addAccount(AccountStatusName.CLOSED);
+
+        ClientDetailsResponseDto result = clientMapper.toDetailsResponse(client);
+
+        assertTrue(result.getHasAccounts());
+        assertNotNull(result.getAccounts());
+        assertEquals(1, result.getAccounts().size());
+
+        assertEquals(AccountStatusDto.CLOSED, result.getAccounts().getFirst().getStatus());
+    }
+
 }
