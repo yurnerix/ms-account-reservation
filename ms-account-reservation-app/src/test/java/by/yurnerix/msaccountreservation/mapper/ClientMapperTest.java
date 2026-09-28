@@ -2,8 +2,11 @@ package by.yurnerix.msaccountreservation.mapper;
 
 import by.yurnerix.msaccountreservation.entity.*;
 import by.yurnerix.msaccountreservation.generated.dto.*;
+import by.yurnerix.msaccountreservation.repository.projection.ClientSearchProjection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -15,6 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 
 class ClientMapperTest {
@@ -158,11 +162,19 @@ class ClientMapperTest {
     @Test
     void toPageResponseShouldMapContentAndPageMetadata() {
 
-        addAccount(AccountStatusName.NEW);
-        addAccount(AccountStatusName.CREATED);
-        addAccount(AccountStatusName.CLOSED);
+        ClientSearchProjection projection = mock(ClientSearchProjection.class);
 
-        Page<Client> page = new PageImpl<>(List.of(client), PageRequest.of(1, 2), 5);
+        when(projection.getClient())
+                .thenReturn(client);
+
+        when(projection.getActiveAccountsCount())
+                .thenReturn(2L);
+
+        Page<ClientSearchProjection> page = new PageImpl<>(
+                List.of(projection),
+                PageRequest.of(1, 2),
+                5L
+        );
 
         ClientPageResponseDto result = clientMapper.toPageResponse(page);
 
@@ -171,15 +183,14 @@ class ClientMapperTest {
 
         ClientSummaryDto summary = result.getContent().getFirst();
 
-        assertEquals(Long.valueOf(2L), summary.getActiveAccountsCount());
-
         assertAll(
                 () -> assertEquals(clientId, summary.getId()),
                 () -> assertEquals(1234567890L, summary.getMdmId()),
                 () -> assertEquals("Иван", summary.getFirstName()),
                 () -> assertEquals("Петров", summary.getLastName()),
                 () -> assertEquals("Сергеевич", summary.getMiddleName()),
-                () -> assertEquals(ClientStatusDto.ACTIVE, summary.getStatus())
+                () -> assertEquals(ClientStatusDto.ACTIVE, summary.getStatus()),
+                () -> assertEquals(Long.valueOf(2L), summary.getActiveAccountsCount())
         );
 
         PageMetadataDto metadata = result.getPageable();
@@ -245,43 +256,22 @@ class ClientMapperTest {
         client.getAccounts().add(account);
     }
 
-    @Test
-    void toSummaryShouldCountActiveAccountsAndMapClientStatus() {
+    @ParameterizedTest
+    @ValueSource(longs = {0L, 1L, 3L})
+    void toSummaryShouldMapProvidedCountWithoutReadingAccounts(long activeAccountsCount) {
         client.setStatus(ClientStatus.BLOCKED);
 
-        addAccount(AccountStatusName.NEW);
-        addAccount(AccountStatusName.IN_CREATION);
-        addAccount(AccountStatusName.CREATED);
-        addAccount(AccountStatusName.CANCELLED);
-        addAccount(AccountStatusName.CLOSED);
+        Client clientSpy = spy(client);
 
-        ClientSummaryDto result = clientMapper.toSummary(client);
+        ClientSummaryDto result = clientMapper.toSummary(clientSpy, activeAccountsCount);
 
         assertAll(
                 () -> assertEquals(clientId, result.getId()),
                 () -> assertEquals(ClientStatusDto.BLOCKED, result.getStatus()),
-                () -> assertEquals(Long.valueOf(3L), result.getActiveAccountsCount())
+                () -> assertEquals(Long.valueOf(activeAccountsCount), result.getActiveAccountsCount())
         );
-    }
 
-    @Test
-    void toSummaryShouldReturnZeroWhenClientHasNoAccounts() {
-        ClientSummaryDto result = clientMapper.toSummary(client);
-
-        assertAll(
-                () -> assertEquals(ClientStatusDto.ACTIVE, result.getStatus()),
-                () -> assertEquals(Long.valueOf(0L), result.getActiveAccountsCount())
-        );
-    }
-
-    @Test
-    void toSummaryShouldReturnZeroWhenAllAccountsAreInactive() {
-        addAccount(AccountStatusName.CANCELLED);
-        addAccount(AccountStatusName.CLOSED);
-
-        ClientSummaryDto result = clientMapper.toSummary(client);
-
-        assertEquals(Long.valueOf(0L), result.getActiveAccountsCount());
+        verify(clientSpy, never()).getAccounts();
     }
 
     @Test

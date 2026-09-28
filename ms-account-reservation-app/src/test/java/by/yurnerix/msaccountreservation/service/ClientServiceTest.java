@@ -1,5 +1,6 @@
 package by.yurnerix.msaccountreservation.service;
 
+import by.yurnerix.msaccountreservation.entity.AccountStatusName;
 import by.yurnerix.msaccountreservation.entity.Client;
 import by.yurnerix.msaccountreservation.entity.ClientStatus;
 import by.yurnerix.msaccountreservation.exception.ClientAlreadyExistsException;
@@ -9,16 +10,14 @@ import by.yurnerix.msaccountreservation.generated.dto.*;
 import by.yurnerix.msaccountreservation.mapper.ClientMapper;
 import by.yurnerix.msaccountreservation.repository.AccountRepository;
 import by.yurnerix.msaccountreservation.repository.ClientRepository;
+import by.yurnerix.msaccountreservation.repository.projection.ClientSearchProjection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.domain.*;
 
 import java.util.List;
 import java.util.Optional;
@@ -110,10 +109,13 @@ class ClientServiceTest {
 
     @Test
     void getClientShouldThrowWhenClientDoesNotExist() {
-        when(clientRepository.findByIdAndStatusNot(clientId, ClientStatus.DELETED))
+        when(clientRepository.findDetailsByIdAndStatusNot(clientId, ClientStatus.DELETED))
                 .thenReturn(Optional.empty());
 
         assertThrows(ClientNotFoundException.class, () -> clientService.getClient(clientId));
+
+        verify(clientRepository)
+                .findDetailsByIdAndStatusNot(clientId, ClientStatus.DELETED);
 
         verifyNoInteractions(clientMapper);
 
@@ -125,7 +127,7 @@ class ClientServiceTest {
 
         expectedResponse.setId(clientId);
 
-        when(clientRepository.findByIdAndStatusNot(clientId, ClientStatus.DELETED
+        when(clientRepository.findDetailsByIdAndStatusNot(clientId, ClientStatus.DELETED
         )).thenReturn(Optional.of(client));
 
         when(clientMapper.toDetailsResponse(client))
@@ -136,7 +138,7 @@ class ClientServiceTest {
         assertSame(expectedResponse, actualResponse);
 
         verify(clientRepository)
-                .findByIdAndStatusNot(clientId, ClientStatus.DELETED);
+                .findDetailsByIdAndStatusNot(clientId, ClientStatus.DELETED);
 
         verify(clientMapper)
                 .toDetailsResponse(client);
@@ -260,11 +262,20 @@ class ClientServiceTest {
 
     @Test
     void searchClientsShouldReturnPageResponse() {
-        Page<Client> clientsPage = new PageImpl<>(List.of(client));
+        PageRequest pageRequest = PageRequest.of(0, 20, Sort.by("lastName", "firstName", "id"));
+
+        ClientSearchProjection projection = mock(ClientSearchProjection.class);
+
+        Page<ClientSearchProjection> clientsPage = new PageImpl<>(List.of(projection), pageRequest, 1L);
 
         ClientPageResponseDto expectedResponse = new ClientPageResponseDto();
 
-        when(clientRepository.findAll(any(Specification.class), any(Pageable.class)
+        when(clientRepository.searchWithActiveAccountsCount(
+                ClientStatus.DELETED,
+                AccountStatusName.activeStatuses(),
+                null,
+                null,
+                pageRequest
         )).thenReturn(clientsPage);
 
         when(clientMapper.toPageResponse(clientsPage))
@@ -274,10 +285,15 @@ class ClientServiceTest {
 
         assertSame(expectedResponse, actualResponse);
 
-        verify(clientRepository).findAll(any(Specification.class), any(Pageable.class));
+        verify(clientRepository).searchWithActiveAccountsCount(
+                ClientStatus.DELETED,
+                AccountStatusName.activeStatuses(),
+                null,
+                null,
+                pageRequest
+        );
 
-        verify(clientMapper)
-                .toPageResponse(clientsPage);
+        verify(clientMapper).toPageResponse(clientsPage);
     }
 
     @Test
@@ -294,6 +310,47 @@ class ClientServiceTest {
 
         verify(clientRepository)
                 .save(client);
+    }
+
+    @Test
+    void searchClientsShouldNormalizeLastNameAndPassMdmId() {
+        Long mdmId = 1234567890L;
+
+        PageRequest pageRequest = PageRequest.of(0, 20, Sort.by("lastName", "firstName", "id"));
+
+        Page<ClientSearchProjection> clientsPage = Page.empty(pageRequest);
+
+        ClientPageResponseDto expectedResponse = new ClientPageResponseDto();
+
+        when(clientRepository.searchWithActiveAccountsCount(
+                ClientStatus.DELETED,
+                AccountStatusName.activeStatuses(),
+                "%иван%",
+                mdmId,
+                pageRequest
+        )).thenReturn(clientsPage);
+
+        when(clientMapper.toPageResponse(clientsPage))
+                .thenReturn(expectedResponse);
+
+        ClientPageResponseDto actualResponse = clientService.searchClients(
+                        0,
+                        20,
+                        "  ИВАН  ",
+                        mdmId
+                );
+
+        assertSame(expectedResponse, actualResponse);
+
+        verify(clientRepository).searchWithActiveAccountsCount(
+                ClientStatus.DELETED,
+                AccountStatusName.activeStatuses(),
+                "%иван%",
+                mdmId,
+                pageRequest
+        );
+
+        verify(clientMapper).toPageResponse(clientsPage);
     }
 
 }

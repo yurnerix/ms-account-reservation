@@ -15,17 +15,17 @@ import by.yurnerix.msaccountreservation.generated.dto.UpdateClientRequestDto;
 import by.yurnerix.msaccountreservation.mapper.ClientMapper;
 import by.yurnerix.msaccountreservation.repository.AccountRepository;
 import by.yurnerix.msaccountreservation.repository.ClientRepository;
-import by.yurnerix.msaccountreservation.specification.ClientSpecifications;
+import by.yurnerix.msaccountreservation.repository.projection.ClientSearchProjection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -62,22 +62,19 @@ public class ClientService {
 
     @Transactional(readOnly = true)
     public ClientDetailsResponseDto getClient(UUID clientId) {
-        Client client = findActiveClient(clientId);
+        Client client = clientRepository
+                .findDetailsByIdAndStatusNot(clientId, ClientStatus.DELETED)
+                .orElseThrow(() -> new ClientNotFoundException(clientId));
 
         return clientMapper.toDetailsResponse(client);
     }
 
     @Transactional(readOnly = true)
     public ClientPageResponseDto searchClients(int page, int size, String lastName, Long mdmId) {
-        Specification<Client> specification = ClientSpecifications.notDeleted();
+        String lastNamePattern = StringUtils.hasText(lastName)
+                ? "%" + lastName.trim().toLowerCase(Locale.ROOT) + "%"
+                : null;
 
-        if (StringUtils.hasText(lastName)) {
-            specification = specification.and(ClientSpecifications.lastNameContains(lastName));
-        }
-
-        if (mdmId != null) {
-            specification = specification.and(ClientSpecifications.mdmIdEquals(mdmId));
-        }
 
         Sort sort = Sort.by(
                 Sort.Order.asc("lastName"),
@@ -87,7 +84,14 @@ public class ClientService {
 
         PageRequest pageRequest = PageRequest.of(page, size, sort);
 
-        Page<Client> clients = clientRepository.findAll(specification, pageRequest);
+        Page<ClientSearchProjection> clients =
+                clientRepository.searchWithActiveAccountsCount(
+                        ClientStatus.DELETED,
+                        ACTIVE_ACCOUNT_STATUSES,
+                        lastNamePattern,
+                        mdmId,
+                        pageRequest
+                );
 
         return clientMapper.toPageResponse(clients);
     }
