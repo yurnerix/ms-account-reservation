@@ -11,29 +11,42 @@ import java.util.Locale;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ClientSpecifications {
 
+    public static Specification<Client> forSearch(ClientStatus excludedStatus, String lastNamePattern, Long mdmId) {
+        Specification<Client> specification = statusNot(excludedStatus);
+
+        if (lastNamePattern != null) {
+            specification = specification.and(lastNameLike(lastNamePattern));
+        }
+
+        if (mdmId != null) {
+            specification = specification.and(mdmIdEquals(mdmId));
+        }
+
+        return specification;
+    }
+
     public static Specification<Client> notDeleted() {
-        return (root, query, criteriaBuilder) ->
-                criteriaBuilder.notEqual(root.get("status"), ClientStatus.DELETED);
+        return statusNot(ClientStatus.DELETED);
+    }
+
+    public static Specification<Client> statusNot(ClientStatus status) {
+        return ((root, query, builder) ->
+                builder.notEqual(root.get("status"), status));
     }
 
     public static Specification<Client> lastNameContains(String lastName) {
-        String normalizedLastName = lastName
-                .trim()
-                .toLowerCase(Locale.ROOT);
+        String pattern = "%" + lastName.trim().toLowerCase(Locale.ROOT) + "%";
 
-        String pattern = "%" + normalizedLastName + "%";
-
-        return (root, query, criteriaBuilder) ->
-                criteriaBuilder
-                        .like(criteriaBuilder
-                                .lower(root.get("lastName")), pattern);
+        return lastNameLike(pattern);
     }
 
     public static Specification<Client> mdmIdEquals(Long mdmId) {
-        return (root, query, criteriaBuilder) ->
-                criteriaBuilder.equal(
-                        root.get("mdmId"),
-                        mdmId
-                );
+        return (root, query, builder) ->
+                builder.equal(root.get("mdmId"), mdmId);
+    }
+
+    private static Specification<Client> lastNameLike(String pattern) {
+        return ((root, query, builder) ->
+                builder.like(builder.lower(root.get("lastName")), pattern));
     }
 }
