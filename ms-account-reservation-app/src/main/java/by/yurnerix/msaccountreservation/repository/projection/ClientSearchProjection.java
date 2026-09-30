@@ -1,11 +1,15 @@
 package by.yurnerix.msaccountreservation.repository.projection;
 
 import by.yurnerix.msaccountreservation.entity.Client;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-public interface ClientSearchProjection {
+@Getter
+@AllArgsConstructor
+public class ClientSearchProjection {
 
-    Client getClient();
+    private final Client client;
 
-    Long getActiveAccountsCount();
+    private final Long activeAccountsCount;
 
 }
