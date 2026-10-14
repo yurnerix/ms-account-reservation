@@ -1,7 +1,6 @@
 package by.yurnerix.msaccountreservation.integration;
 
 import by.yurnerix.msaccountreservation.generated.dto.*;
-import by.yurnerix.msaccountreservation.integration.dataset.ClientQueryCountDataSetProvider;
 import by.yurnerix.msaccountreservation.service.ClientService;
 import com.github.database.rider.core.api.dataset.DataSet;
 import com.github.database.rider.junit5.api.DBRider;
@@ -27,7 +26,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
 @DBRider
-@DataSet(provider = ClientQueryCountDataSetProvider.class,
+@DataSet(value = "datasets/client/query-count.yml",
         cleanBefore = true,
         cleanAfter = true,
         disableConstraints = true,
@@ -40,6 +39,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @Isolated("Используется общий счётчик Hibernate Statistics")
 @Execution(ExecutionMode.SAME_THREAD)
 class ClientQueryCountIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
+
+    private static final String SEARCH_LAST_NAME = "UPG9QueryCount";
+    private static final int SEARCH_CLIENTS_COUNT = 11;
 
     @Autowired
     private ClientService clientService;
@@ -68,7 +70,7 @@ class ClientQueryCountIntegrationTest extends AbstractMockedCurrencyIntegrationT
             "1, 5"
     })
     void getClientShouldUseOneStatement(long clientNumber, int accountsCount) {
-        UUID clientId = ClientQueryCountDataSetProvider.clientId(clientNumber);
+        UUID clientId = new UUID(0L, clientNumber);
 
         startSqlCounting();
 
@@ -96,10 +98,10 @@ class ClientQueryCountIntegrationTest extends AbstractMockedCurrencyIntegrationT
 
     @ParameterizedTest
     @ValueSource(ints = {1, 5, 10})
-    void searchClientsShouldUseTwoStatements(int pageSize) {
+    void searchClientsShouldUseThreeStatements(int pageSize) {
         startSqlCounting();
 
-        ClientPageResponseDto response = clientService.searchClients(0, pageSize, ClientQueryCountDataSetProvider.SEARCH_LAST_NAME, null);
+        ClientPageResponseDto response = clientService.searchClients(0, pageSize, SEARCH_LAST_NAME, null);
 
         long statementCount = statistics.getPrepareStatementCount();
 
@@ -110,7 +112,7 @@ class ClientQueryCountIntegrationTest extends AbstractMockedCurrencyIntegrationT
         assertEquals(0, response.getPageable().getPageNumber());
         assertEquals(pageSize, response.getPageable().getPageSize());
 
-        int totalClients = ClientQueryCountDataSetProvider.SEARCH_CLIENTS_COUNT;
+        int totalClients = SEARCH_CLIENTS_COUNT;
 
         assertEquals(Long.valueOf(totalClients), response.getPageable().getTotalElements());
 
@@ -121,7 +123,7 @@ class ClientQueryCountIntegrationTest extends AbstractMockedCurrencyIntegrationT
         for (int index = 0; index < pageSize; index++) {
             ClientSummaryDto actualClient = response.getContent().get(index);
 
-            UUID expectedId = ClientQueryCountDataSetProvider.clientId(index + 1L);
+            UUID expectedId = new UUID(0L, index + 1L);
 
             ClientStatusDto expectedStatus = index % 2 == 0 ? ClientStatusDto.ACTIVE : ClientStatusDto.BLOCKED;
 
@@ -133,7 +135,7 @@ class ClientQueryCountIntegrationTest extends AbstractMockedCurrencyIntegrationT
             assertEquals(Long.valueOf(expectedActiveAccountsCount), actualClient.getActiveAccountsCount());
         }
 
-        assertEquals(2L, statementCount, "Поиск должен выполнять основной запрос и один COUNT");
+        assertEquals(3L, statementCount, "Поиск должен выполнять запрос страницы, COUNT клиентов " + "и один общий запрос количества активных счетов");
     }
 
     private void startSqlCounting() {
