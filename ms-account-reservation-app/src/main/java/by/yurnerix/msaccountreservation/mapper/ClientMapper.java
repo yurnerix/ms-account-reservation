@@ -13,6 +13,7 @@ import by.yurnerix.msaccountreservation.generated.dto.CreateClientRequestDto;
 import by.yurnerix.msaccountreservation.generated.dto.PageMetadataDto;
 import by.yurnerix.msaccountreservation.generated.dto.UpdateClientRequestDto;
 import by.yurnerix.msaccountreservation.generated.dto.AccountResponseDto;
+import by.yurnerix.msaccountreservation.repository.projection.ClientSearchProjection;
 import org.mapstruct.*;
 import org.springframework.data.domain.Page;
 
@@ -54,14 +55,14 @@ public interface ClientMapper {
         return accounts != null && !accounts.isEmpty();
     }
 
-    @Mapping(target = "activeAccountsCount", source = "accounts", qualifiedByName = "countActiveAccounts")
-    ClientSummaryDto toSummary(Client client);
+    @Mapping(target = "activeAccountsCount", source = "activeAccountsCount")
+    ClientSummaryDto toSummary(Client client, long activeAccountsCount);
 
 
-    default ClientPageResponseDto toPageResponse(Page<Client> page) {
+    default ClientPageResponseDto toPageResponse(Page<ClientSearchProjection> page) {
         List<ClientSummaryDto> content = page.getContent()
                 .stream()
-                .map(this::toSummary)
+                .map(row -> toSummary(row.getClient(), row.getActiveAccountsCount()))
                 .toList();
 
         PageMetadataDto metadata = new PageMetadataDto()
@@ -98,14 +99,4 @@ public interface ClientMapper {
         return ClientStatusDto.fromValue(status.name());
     }
 
-    @Named("countActiveAccounts")
-    default long countActiveAccounts(List<Account> accounts) {
-        if (accounts == null) {
-            return 0L;
-        }
-
-        return accounts.stream()
-                .filter(account -> account.getStatus().getName().isActive())
-                .count();
-    }
 }
