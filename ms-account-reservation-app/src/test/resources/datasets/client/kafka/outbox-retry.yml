@@ -1,0 +1,10 @@
+client_event_outbox:
+  - id: 900001
+    event_id: "44444444-4444-4444-4444-444444444444"
+    client_id: "55555555-5555-5555-5555-555555555555"
+    event_type: "CREATED"
+    occurred_at: "2026-01-01 10:00:00"
+    published_at: null
+    attempts: 0
+    next_attempt_at: "2026-01-01 10:00:00"
+    last_error: null
