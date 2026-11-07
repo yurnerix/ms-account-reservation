@@ -22,7 +22,7 @@ public class ClientChangedEventListener {
     private final ObjectMapper objectMapper;
     private final ClientEventProcessingService processingService;
 
-    @KafkaListener(id = "clientChangedListener", topics = "${app.kafka.client-events-topic}", groupId = "${spring.kafka.consumer.group-id}")
+    @KafkaListener(id = "clientChangedListener", topics = "#{@clientEventConsumerTopics}", groupId = "${spring.kafka.consumer.group-id}")
     public void onMessage(ConsumerRecord<String, String> record, Acknowledgment acknowledgment) {
         ClientChangedEvent event = readEvent(record);
 
@@ -32,11 +32,11 @@ public class ClientChangedEventListener {
         acknowledgment.acknowledge();
 
         log.info(
-                "Client event consumed: clientId={}, eventId={}, " +
-                        "processed={}, partition={}, offset={}",
+                "Client event consumed: clientId={}, eventId={}, processed={}, " + "topic={}, partition={}, offset={}",
                 event.clientId(),
                 event.eventId(),
                 processed,
+                record.topic(),
                 record.partition(),
                 record.offset()
         );

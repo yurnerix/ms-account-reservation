@@ -121,6 +121,7 @@ app:
   kafka:
     enabled: ${KAFKA_ENABLED:true}
     client-events-topic: ${KAFKA_CLIENT_EVENTS_TOPIC:client-changed.v1}
+    client-consumer-topics: ${KAFKA_CLIENT_CONSUMER_TOPICS:${app.kafka.client-events-topic}}
     partitions: ${KAFKA_PARTITIONS:3}
     replication-factor: ${KAFKA_REPLICATION_FACTOR:1}
 
@@ -128,6 +129,9 @@ app:
     outbox-poll-interval-ms: ${KAFKA_OUTBOX_POLL_INTERVAL_MS:1000}
     outbox-retry-delay-ms: ${KAFKA_OUTBOX_RETRY_DELAY_MS:5000}
     outbox-send-timeout-ms: ${KAFKA_OUTBOX_SEND_TIMEOUT_MS:15000}
+    dlt-send-timeout-ms: ${KAFKA_DLT_SEND_TIMEOUT_MS:15000}
+    consumer-retry-interval-ms: ${KAFKA_CONSUMER_RETRY_INTERVAL_MS:1000}
+    consumer-retry-count: ${KAFKA_CONSUMER_RETRY_COUNT:2}
 
   currency-client:
     enabled: ${CURRENCY_CLIENT_ENABLED:true}

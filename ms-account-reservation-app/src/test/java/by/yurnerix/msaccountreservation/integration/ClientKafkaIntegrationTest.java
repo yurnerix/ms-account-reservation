@@ -24,14 +24,16 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Isolated;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.kafka.test.utils.ContainerTestUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -46,6 +48,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.*;
@@ -58,6 +61,8 @@ import static org.mockito.Mockito.*;
 class ClientKafkaIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
 
     private static final String TOPIC = "client-changed-it-" + UUID.randomUUID();
+
+    private static final List<String> CONSUMER_TOPICS = List.of(TOPIC, TOPIC + "-import", TOPIC + "-sync");
 
     private static final String DLT_TOPIC = TOPIC + ".DLT";
 
@@ -89,6 +94,9 @@ class ClientKafkaIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
         registry.add("spring.kafka.listener.auto-startup", () -> true);
         registry.add("spring.kafka.listener.concurrency", () -> 3);
         registry.add("spring.kafka.listener.ack-mode", () -> "manual_immediate");
+        registry.add("app.kafka.client-consumer-topics", () -> String.join(",", CONSUMER_TOPICS));
+        registry.add("app.kafka.consumer-retry-count", () -> 2L);
+        registry.add("app.kafka.consumer-retry-interval-ms", () -> 1000L);
     }
 
     @Autowired
@@ -123,7 +131,28 @@ class ClientKafkaIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
 
         assertNotNull(container, "Kafka listener должен быть зарегистрирован");
 
-        ContainerTestUtils.waitForAssignment(container, 3);
+        assertTrue(container instanceof ConcurrentMessageListenerContainer<?, ?>, "Ожидается контейнер с несколькими consumer");
+
+        ConcurrentMessageListenerContainer<?, ?> concurrentContainer = (ConcurrentMessageListenerContainer<?, ?>) container;
+
+        await()
+                .alias("Все три consumer должны получить свои партиции")
+                .atMost(WAIT_TIMEOUT)
+                .pollInterval(Duration.ofMillis(200))
+                .untilAsserted(() -> {
+                    var consumers = concurrentContainer.getContainers();
+
+                    assertEquals(3, consumers.size());
+
+                    for (var consumer : consumers) {
+                        var assignedPartitions = consumer.getAssignedPartitions();
+
+                        assertNotNull(assignedPartitions);
+
+
+                        assertEquals(CONSUMER_TOPICS.size(), assignedPartitions.size());
+                    }
+                });
     }
 
     @Test
@@ -355,9 +384,12 @@ class ClientKafkaIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
     }
 
     private RecordMetadata sendPayload(String key, String payload) throws Exception {
+        return sendPayload(TOPIC, key, payload);
+    }
 
+    private RecordMetadata sendPayload(String topic, String key, String payload) throws Exception {
         return kafkaTemplate
-                .send(TOPIC, key, payload)
+                .send(topic, key, payload)
                 .get(15, TimeUnit.SECONDS)
                 .getRecordMetadata();
     }
@@ -439,7 +471,7 @@ class ClientKafkaIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
     }
 
     private ConsumerRecord<String, String> awaitDltRecord(RecordMetadata sourceMetadata, String expectedKey) {
-        TopicPartition partition = new TopicPartition(DLT_TOPIC, sourceMetadata.partition());
+        TopicPartition partition = new TopicPartition(sourceMetadata.topic() + ".DLT", sourceMetadata.partition());
 
         try (KafkaConsumer<String, String> consumer = createDltConsumer()) {
             consumer.assign(List.of(partition));
@@ -458,5 +490,66 @@ class ClientKafkaIntegrationTest extends AbstractMockedCurrencyIntegrationTest {
 
             return fail("Не дождались сообщения в DLT с ключом " + expectedKey);
         }
+    }
+
+    private static Stream<String> incomingTopics() {
+        return CONSUMER_TOPICS.stream();
+    }
+
+    @ParameterizedTest
+    @MethodSource("incomingTopics")
+    void shouldConsumeEventFromEachConfiguredTopic(String topic) throws Exception {
+
+        ClientChangedEvent event = createEvent();
+
+        RecordMetadata metadata = sendPayload(topic, event.clientId().toString(), objectMapper.writeValueAsString(event));
+
+        awaitCommittedOffset(metadata);
+
+        assertStoredCounts(event, 1L, 1L);
+    }
+
+    @ParameterizedTest
+    @MethodSource("incomingTopics")
+    void shouldRouteInvalidEventToItsSourceDlt(String topic) throws Exception {
+
+        ClientChangedEvent event = createEvent();
+
+        ObjectNode payloadNode = objectMapper.valueToTree(event);
+        payloadNode.remove("eventId");
+
+        String payload = objectMapper.writeValueAsString(payloadNode);
+
+        RecordMetadata metadata = sendPayload(topic, event.clientId().toString(), payload);
+
+        ConsumerRecord<String, String> deadLetter = awaitDltRecord(metadata, event.clientId().toString());
+
+        assertEquals(topic + ".DLT", deadLetter.topic());
+        assertEquals(event.clientId().toString(), deadLetter.key());
+        assertEquals(payload, deadLetter.value());
+        assertEquals(metadata.partition(), deadLetter.partition());
+
+        awaitCommittedOffset(metadata);
+
+        assertStoredCounts(event, 0L, 0L);
+    }
+
+    @Test
+    void shouldSkipSameEventReceivedFromDifferentTopics() throws Exception {
+        ClientChangedEvent event = createEvent();
+
+        String key = event.clientId().toString();
+        String payload = objectMapper.writeValueAsString(event);
+
+        RecordMetadata first = sendPayload(CONSUMER_TOPICS.get(0), key, payload);
+
+        awaitCommittedOffset(first);
+        assertStoredCounts(event, 1L, 1L);
+
+        RecordMetadata duplicate = sendPayload(CONSUMER_TOPICS.get(1), key, payload);
+
+        awaitCommittedOffset(duplicate);
+
+        assertStoredCounts(event, 1L, 1L);
     }
 }
