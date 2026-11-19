@@ -3,6 +3,7 @@ package by.yurnerix.msaccountreservation.service;
 import by.yurnerix.msaccountreservation.entity.AccountStatusName;
 import by.yurnerix.msaccountreservation.entity.Client;
 import by.yurnerix.msaccountreservation.entity.ClientStatus;
+import by.yurnerix.msaccountreservation.event.ClientEventType;
 import by.yurnerix.msaccountreservation.exception.ClientAlreadyExistsException;
 import by.yurnerix.msaccountreservation.exception.ClientHasActiveAccountException;
 import by.yurnerix.msaccountreservation.exception.ClientNotFoundException;
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.domain.*;
 
 import java.util.List;
@@ -38,6 +40,9 @@ class ClientServiceTest {
 
     @Mock
     private ClientMapper clientMapper;
+
+    @Mock
+    private ClientEventOutboxWriter outboxWriter;
 
     @InjectMocks
     private ClientService clientService;
@@ -88,6 +93,8 @@ class ClientServiceTest {
         verify(clientMapper)
                 .toResponse(client);
 
+        verify(outboxWriter).write(clientId, ClientEventType.CREATED);
+
     }
 
     @Test
@@ -105,6 +112,7 @@ class ClientServiceTest {
 
         verifyNoInteractions(clientMapper);
 
+        verifyNoInteractions(outboxWriter);
     }
 
     @Test
@@ -174,6 +182,7 @@ class ClientServiceTest {
         verify(clientRepository)
                 .saveAndFlush(client);
 
+        verify(outboxWriter).write(clientId, ClientEventType.UPDATED);
     }
 
     @Test
@@ -194,6 +203,8 @@ class ClientServiceTest {
 
         verify(clientRepository, never())
                 .saveAndFlush(any(Client.class));
+
+        verifyNoInteractions(outboxWriter);
     }
 
     @Test
@@ -209,7 +220,9 @@ class ClientServiceTest {
         assertEquals(ClientStatus.ACTIVE, client.getStatus());
 
         verify(clientRepository, never())
-                .save(any(Client.class));
+                .saveAndFlush(any(Client.class));
+
+        verifyNoInteractions(outboxWriter);
     }
 
     @Test
@@ -309,7 +322,9 @@ class ClientServiceTest {
         assertEquals(ClientStatus.DELETED, client.getStatus());
 
         verify(clientRepository)
-                .save(client);
+                .saveAndFlush(client);
+
+        verify(outboxWriter).write(clientId, ClientEventType.DELETED);
     }
 
     @Test
@@ -351,6 +366,39 @@ class ClientServiceTest {
         );
 
         verify(clientMapper).toPageResponse(clientsPage);
+    }
+
+    @Test
+    void createClientShouldPropagateOutboxFailure() {
+        CreateClientRequestDto request = new CreateClientRequestDto();
+        request.setMdmId(client.getMdmId());
+
+        when(clientRepository.existsByMdmId(request.getMdmId()))
+                .thenReturn(false);
+
+        when(clientMapper.toEntity(request))
+                .thenReturn(client);
+
+        when(clientRepository.saveAndFlush(client))
+                .thenReturn(client);
+
+        DataAccessResourceFailureException failure = new DataAccessResourceFailureException("Outbox database write failed");
+
+        doThrow(failure)
+                .when(outboxWriter)
+                .write(clientId, ClientEventType.CREATED);
+
+        DataAccessResourceFailureException actualException =
+                assertThrows(DataAccessResourceFailureException.class, () -> clientService.createClient(request));
+
+        assertSame(failure, actualException);
+
+        verify(clientRepository).saveAndFlush(client);
+
+        verify(outboxWriter).write(clientId, ClientEventType.CREATED);
+
+        verify(clientMapper, never())
+                .toResponse(any(Client.class));
     }
 
 }

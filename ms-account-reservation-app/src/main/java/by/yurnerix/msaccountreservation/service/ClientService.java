@@ -3,6 +3,7 @@ package by.yurnerix.msaccountreservation.service;
 import by.yurnerix.msaccountreservation.entity.AccountStatusName;
 import by.yurnerix.msaccountreservation.entity.Client;
 import by.yurnerix.msaccountreservation.entity.ClientStatus;
+import by.yurnerix.msaccountreservation.event.ClientEventType;
 import by.yurnerix.msaccountreservation.exception.ClientAlreadyExistsException;
 import by.yurnerix.msaccountreservation.exception.ClientHasActiveAccountException;
 import by.yurnerix.msaccountreservation.exception.ClientNotFoundException;
@@ -39,6 +40,7 @@ public class ClientService {
     private final ClientRepository clientRepository;
     private final AccountRepository accountRepository;
     private final ClientMapper clientMapper;
+    private final ClientEventOutboxWriter outboxWriter;
 
     @Transactional
     public ClientResponseDto createClient(CreateClientRequestDto request) {
@@ -50,6 +52,8 @@ public class ClientService {
 
         Client client = clientMapper.toEntity(request);
         Client savedClient = clientRepository.saveAndFlush(client);
+
+        outboxWriter.write(savedClient.getId(), ClientEventType.CREATED);
 
         log.info(
                 "Client created successfully: clientId={}, mdmId={}",
@@ -104,6 +108,8 @@ public class ClientService {
 
         Client updatedClient = clientRepository.saveAndFlush(client);
 
+        outboxWriter.write(updatedClient.getId(), ClientEventType.UPDATED);
+
         log.info(
                 "Client updated successfully: clientId={}",
                 updatedClient.getId()
@@ -128,7 +134,9 @@ public class ClientService {
         }
 
         client.setStatus(ClientStatus.DELETED);
-        clientRepository.save(client);
+        clientRepository.saveAndFlush(client);
+
+        outboxWriter.write(clientId, ClientEventType.DELETED);
 
         log.info(
                 "Client soft deleted successfully: clientId={}",

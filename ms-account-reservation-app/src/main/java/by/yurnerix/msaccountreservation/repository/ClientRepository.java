@@ -6,11 +6,13 @@ import by.yurnerix.msaccountreservation.entity.ClientStatus;
 import by.yurnerix.msaccountreservation.repository.projection.ClientAccountCountProjection;
 import by.yurnerix.msaccountreservation.repository.projection.ClientSearchProjection;
 import by.yurnerix.msaccountreservation.specification.ClientSpecifications;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,8 @@ public interface ClientRepository extends JpaRepository<Client, UUID>, JpaSpecif
 
     boolean existsByMdmId(Long mdmId);
 
+    // изменение клиента внутри транзакции
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<Client> findByIdAndStatusNot(UUID id, ClientStatus status);
 
     @Query("""

@@ -1,0 +1,197 @@
+databaseChangeLog:
+  - changeSet:
+      id: upg-10-create-client-event-outbox
+      author: yurnerix
+      dbms: postgresql
+
+      changes:
+        - createTable:
+            tableName: client_event_outbox
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_client_event_outbox
+                    nullable: false
+
+              - column:
+                  name: event_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: client_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: event_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: occurred_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: published_at
+                  type: TIMESTAMP WITH TIME ZONE
+
+              - column:
+                  name: attempts
+                  type: INTEGER
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: next_attempt_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: last_error
+                  type: TEXT
+
+        - addUniqueConstraint:
+            tableName: client_event_outbox
+            columnNames: event_id
+            constraintName: uk_client_event_outbox_event_id
+
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE client_event_outbox
+                  ADD CONSTRAINT chk_client_event_outbox_event_type
+                  CHECK (event_type IN ('CREATED', 'UPDATED', 'DELETED'));
+
+              ALTER TABLE client_event_outbox
+                  ADD CONSTRAINT chk_client_event_outbox_attempts
+                  CHECK (attempts >= 0);
+
+              CREATE INDEX idx_client_event_outbox_pending
+                  ON client_event_outbox (next_attempt_at, id)
+                  WHERE published_at IS NULL;
+
+              CREATE INDEX idx_client_event_outbox_client_pending
+                  ON client_event_outbox (client_id, id)
+                  WHERE published_at IS NULL;
+
+      rollback:
+        - dropTable:
+            tableName: client_event_outbox
+
+  - changeSet:
+      id: upg-10-create-processed-client-event
+      author: yurnerix
+      dbms: postgresql
+
+      changes:
+        - createTable:
+            tableName: processed_client_event
+            columns:
+              - column:
+                  name: client_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: event_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: processed_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addPrimaryKey:
+            tableName: processed_client_event
+            columnNames: client_id,event_id
+            constraintName: pk_processed_client_event
+
+      rollback:
+        - dropTable:
+            tableName: processed_client_event
+
+  - changeSet:
+      id: upg-10-create-client-event-audit
+      author: yurnerix
+      dbms: postgresql
+
+      changes:
+        - createTable:
+            tableName: client_event_audit
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_client_event_audit
+                    nullable: false
+
+              - column:
+                  name: client_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: event_id
+                  type: UUID
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: event_type
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: occurred_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+
+              - column:
+                  name: processed_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            tableName: client_event_audit
+            indexName: idx_client_event_audit_client_event
+            columns:
+              - column:
+                  name: client_id
+              - column:
+                  name: event_id
+
+        - sql:
+            sql: |
+              ALTER TABLE client_event_audit
+                  ADD CONSTRAINT chk_client_event_audit_event_type
+                  CHECK (event_type IN ('CREATED', 'UPDATED', 'DELETED'));
+
+      rollback:
+        - dropTable:
+            tableName: client_event_audit
